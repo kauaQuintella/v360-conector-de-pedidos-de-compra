@@ -9,29 +9,32 @@ import java.math.BigDecimal;
 /**
  * DTO de entrada do Alfa para cada linha de item do pedido.
  * Todos os campos numéricos usam BigDecimal para preservar precisão (DESING.md 3.3).
+ * O campo "line" vem como inteiro no JSON e é desserializado como String pelo Jackson.
  */
 public record AlfaItemDTO(
+        @JsonProperty("line")
         @NotBlank
         String linha,
 
-        @JsonProperty("codigo_material")
+        @JsonProperty("material")
         @NotBlank
         String codigoMaterial,
 
+        @JsonProperty("description")
         String descricao,
 
-        @JsonProperty("unidade_medida")
+        @JsonProperty("uom")
         String unidadeMedida,
 
-        @JsonProperty("quantidade_pedida")
+        @JsonProperty("quantity_ordered")
         @NotNull
         BigDecimal quantidadePedida,
 
-        @JsonProperty("quantidade_recebida")
+        @JsonProperty("quantity_received")
         @NotNull
         BigDecimal quantidadeRecebida,
 
-        @JsonProperty("preco_unitario")
+        @JsonProperty("unit_price")
         @NotNull
         BigDecimal precoUnitario
 ) {}

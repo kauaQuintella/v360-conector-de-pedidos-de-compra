@@ -1,5 +1,6 @@
 package com.v360.prosel.conectorpedidoscompra.dto.alfa;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -8,6 +9,9 @@ import jakarta.validation.constraints.NotBlank;
  * CnpjSanitizer antes de persistir (DESING.md seção 2).
  */
 public record AlfaFornecedorDTO(
+        @JsonProperty("tax_id")
         @NotBlank String cnpj,
+
+        @JsonProperty("name")
         @NotBlank String nome
 ) {}

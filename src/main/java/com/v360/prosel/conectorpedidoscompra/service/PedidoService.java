@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,9 +41,10 @@ public class PedidoService {
      */
     @Transactional
     public Pedido upsert(Pedido incoming) {
+        List<Item> itens = new ArrayList<>(incoming.getItens()); // cópia defensiva antes de qualquer mutação
         Fornecedor fornecedor = resolverFornecedor(incoming.getFornecedor());
         Pedido pedido = resolverPedido(incoming, fornecedor);
-        resolverItens(incoming.getItens(), pedido);
+        resolverItens(itens, pedido);
         return pedidoRepository.findById(pedido.getId()).orElse(pedido);
     }
 
@@ -78,7 +80,7 @@ public class PedidoService {
     private Pedido criarPedido(Pedido incoming, Fornecedor fornecedor) {
         incoming.setFornecedor(fornecedor);
         incoming.setDataIngestao(Instant.now());
-        incoming.getItens().clear(); // itens são gerenciados separadamente em resolverItens
+        incoming.getItens().clear(); // Itens são gerenciados separadamente em resolverItens
         return pedidoRepository.save(incoming);
     }
 

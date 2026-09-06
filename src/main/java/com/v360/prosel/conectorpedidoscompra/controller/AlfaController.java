@@ -1,6 +1,6 @@
 package com.v360.prosel.conectorpedidoscompra.controller;
 
-import com.v360.prosel.conectorpedidoscompra.dto.alfa.AlfaPedidoDTO;
+import com.v360.prosel.conectorpedidoscompra.dto.alfa.AlfaPayloadDTO;
 import com.v360.prosel.conectorpedidoscompra.entity.Pedido;
 import com.v360.prosel.conectorpedidoscompra.ingestor.AlfaIngestor;
 import com.v360.prosel.conectorpedidoscompra.service.PedidoService;
@@ -9,8 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Endpoint de ingestão de pedidos do cliente Alfa.
@@ -27,22 +27,26 @@ public class AlfaController {
     private final PedidoService pedidoService;
 
     /**
-     * Recebe um pedido de compra do cliente Alfa no formato JSON aninhado,
-     * traduz via AlfaIngestor e persiste via PedidoService (upsert).
+     * Recebe um payload do cliente Alfa contendo uma lista de pedidos de compra,
+     * traduz cada pedido via AlfaIngestor e persiste via PedidoService (upsert).
      *
-     * @param dto payload validado pelo Bean Validation
-     * @return id do pedido persistido e mensagem de confirmação
+     * @param payload payload validado pelo Bean Validation, contendo a lista purchase_orders
+     * @return lista de resultados, um por pedido processado
      */
     @PostMapping("/alfa")
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, Object> ingestirAlfa(@RequestBody @Valid AlfaPedidoDTO dto) {
-        Pedido pedido = alfaIngestor.toEntity(dto);
-        Pedido salvo = pedidoService.upsert(pedido);
-        return Map.of(
-                "id_pedido", salvo.getId(),
-                "numero_pedido_origem", salvo.getNumeroPedidoOrigem(),
-                "cliente_origem", salvo.getClienteOrigem(),
-                "status", salvo.getStatus()
-        );
+    public List<Map<String, Object>> ingestirAlfa(@RequestBody @Valid AlfaPayloadDTO payload) {
+        return payload.purchaseOrders().stream()
+                .map(dto -> {
+                    Pedido pedido = alfaIngestor.toEntity(dto);
+                    Pedido salvo = pedidoService.upsert(pedido);
+                    return Map.<String, Object>of(
+                            "id_pedido",            salvo.getId(),
+                            "numero_pedido_origem",  salvo.getNumeroPedidoOrigem(),
+                            "cliente_origem",        salvo.getClienteOrigem(),
+                            "status",                salvo.getStatus()
+                    );
+                })
+                .toList();
     }
 }

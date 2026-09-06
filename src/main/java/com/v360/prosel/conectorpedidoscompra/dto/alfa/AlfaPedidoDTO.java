@@ -6,34 +6,38 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
  * DTO raiz de entrada do Alfa para um pedido de compra completo.
  *
- * O Alfa envia data em ISO 8601 ("2026-08-15T00:00:00Z") — Jackson desserializa
- * Instant diretamente, sem necessidade de conversão adicional (DESING.md seção 6).
+ * O Alfa envia dataCriacao no formato YYYY-MM-DD (ex: "2026-08-05").
+ * Desserializado como LocalDate; a conversão para Instant é responsabilidade
+ * do AlfaDateParser (normalizador).
  */
 public record AlfaPedidoDTO(
-        @JsonProperty("numero_pedido")
+        @JsonProperty("po_number")
         @NotBlank
         String numeroPedido,
 
-        @JsonProperty("data_criacao")
+        @JsonProperty("created_at")
         @NotNull
-        Instant dataCriacao,
+        LocalDate dataCriacao,
 
         @NotBlank
         String status,
 
+        @JsonProperty("currency")
         @NotBlank
         String moeda,
 
+        @JsonProperty("vendor")
         @NotNull
         @Valid
         AlfaFornecedorDTO fornecedor,
 
+        @JsonProperty("items")
         @NotEmpty
         @Valid
         List<AlfaItemDTO> itens
