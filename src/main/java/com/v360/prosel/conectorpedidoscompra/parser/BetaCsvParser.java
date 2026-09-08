@@ -1,5 +1,6 @@
 package com.v360.prosel.conectorpedidoscompra.parser;
 
+import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
@@ -112,7 +113,11 @@ public class BetaCsvParser {
         }
         String csv = String.join("\n", linhasLogicas);
         try (CSVReader reader = new CSVReaderBuilder(new StringReader(csv))
-                .withCSVParser(new CSVParserBuilder().withSeparator(';').build())
+                .withCSVParser(new CSVParserBuilder()
+                        .withSeparator(';')
+                        .withEscapeChar(CSVParser.NULL_CHARACTER)
+                        .withQuoteChar(CSVParser.NULL_CHARACTER)
+                        .build())
                 .build()) {
             return new CsvToBeanBuilder<T>(reader)
                     .withType(type)
