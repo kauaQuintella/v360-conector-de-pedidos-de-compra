@@ -1,14 +1,15 @@
 package com.v360.prosel.conectorpedidoscompra.dto.conferencia;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.v360.prosel.conectorpedidoscompra.enums.ResultadoConferencia;
 
 import java.util.List;
 import java.util.UUID;
 
 public record ConferenciaResponseDTO(
-        UUID idConferencia,
-        UUID idPedido,
-        ResultadoConferencia resultado,
-        List<DivergenciaDTO> divergencias
+        @JsonProperty("id_conferencia") UUID idConferencia,
+        @JsonProperty("id_pedido") UUID idPedido,
+        @JsonProperty("resultado") ResultadoConferencia resultado,
+        @JsonProperty("divergencias") List<DivergenciaDTO> divergencias
 ) {
 }

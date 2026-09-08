@@ -1,0 +1,11 @@
+package com.v360.prosel.conectorpedidoscompra.enums;
+
+public enum TipoDivergencia {
+    PEDIDO_NAO_ENCONTRADO,
+    FORNECEDOR_DIVERGENTE,
+    MATERIAL_NAO_ENCONTRADO,
+    QUANTIDADE_EXCEDE_PENDENTE,
+    VALOR_DIVERGENTE,
+    PEDIDO_BLOQUEADO,
+    PEDIDO_ENCERRADO
+}
