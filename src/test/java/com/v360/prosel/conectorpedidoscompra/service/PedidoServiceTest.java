@@ -4,6 +4,7 @@ import com.v360.prosel.conectorpedidoscompra.entity.Fornecedor;
 import com.v360.prosel.conectorpedidoscompra.entity.Item;
 import com.v360.prosel.conectorpedidoscompra.entity.Pedido;
 import com.v360.prosel.conectorpedidoscompra.enums.StatusPedido;
+import com.v360.prosel.conectorpedidoscompra.repository.DivergenciaRepository;
 import com.v360.prosel.conectorpedidoscompra.repository.FornecedorRepository;
 import com.v360.prosel.conectorpedidoscompra.repository.ItemRepository;
 import com.v360.prosel.conectorpedidoscompra.repository.PedidoRepository;
@@ -44,6 +45,9 @@ class PedidoServiceTest {
 
     @Mock
     private ItemRepository itemRepository;
+
+    @Mock
+    private DivergenciaRepository divergenciaRepository;
 
     @InjectMocks
     private PedidoService pedidoService;
@@ -272,5 +276,101 @@ class PedidoServiceTest {
 
         // save deve ser chamado no item existente (atualização), não em um item novo
         verify(itemRepository, times(1)).save(itemExistente);
+    }
+
+    @Test
+    @DisplayName("Linha órfã sem recebimento e histórico é removida")
+    void upsert_linhaOrfaSemHistorico_remove() {
+        Fornecedor fornecedor = fornecedorPersistido("12345678000190", "Fornecedor");
+        Pedido existente = pedidoPersistido("AL-008", fornecedor);
+        Item orfao = itemTransiente("1", "MAT-ORFAO");
+        orfao.setPedido(existente);
+        orfao.setQuantidadeRecebida(BigDecimal.ZERO);
+
+        Pedido incoming = pedidoTransiente("AL-008", fornecedorTransiente(fornecedor.getCnpj(), fornecedor.getNome()),
+                List.of());
+        when(fornecedorRepository.findByCnpj(any())).thenReturn(Optional.of(fornecedor));
+        when(fornecedorRepository.save(any())).thenReturn(fornecedor);
+        when(pedidoRepository.findByNumeroPedidoOrigemAndClienteOrigem("AL-008", "ALFA"))
+                .thenReturn(Optional.of(existente));
+        when(pedidoRepository.save(existente)).thenReturn(existente);
+        when(pedidoRepository.findById(existente.getId())).thenReturn(Optional.of(existente));
+        when(itemRepository.findByPedido(existente)).thenReturn(List.of(orfao));
+        when(divergenciaRepository.existsByConferencia_Pedido_IdAndCodigoMaterial(
+                existente.getId(), "MAT-ORFAO")).thenReturn(false);
+
+        pedidoService.upsert(incoming);
+
+        verify(itemRepository).delete(orfao);
+    }
+
+    @Test
+    @DisplayName("Linha órfã com recebimento é preservada")
+    void upsert_linhaOrfaComRecebimento_preserva() {
+        Fornecedor fornecedor = fornecedorPersistido("12345678000190", "Fornecedor");
+        Pedido existente = pedidoPersistido("AL-009", fornecedor);
+        Item orfao = itemTransiente("1", "MAT-MOVIMENTADO");
+        orfao.setPedido(existente);
+        orfao.setQuantidadeRecebida(new BigDecimal("1"));
+
+        Pedido incoming = pedidoTransiente("AL-009", fornecedorTransiente(fornecedor.getCnpj(), fornecedor.getNome()),
+                List.of());
+        prepararPedidoExistente(incoming, existente);
+        when(itemRepository.findByPedido(existente)).thenReturn(List.of(orfao));
+
+        pedidoService.upsert(incoming);
+
+        verify(itemRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Linha órfã referenciada em conferência é preservada")
+    void upsert_linhaOrfaComHistorico_preserva() {
+        Fornecedor fornecedor = fornecedorPersistido("12345678000190", "Fornecedor");
+        Pedido existente = pedidoPersistido("AL-010", fornecedor);
+        Item orfao = itemTransiente("1", "MAT-HISTORICO");
+        orfao.setPedido(existente);
+        orfao.setQuantidadeRecebida(BigDecimal.ZERO);
+
+        Pedido incoming = pedidoTransiente("AL-010", fornecedorTransiente(fornecedor.getCnpj(), fornecedor.getNome()),
+                List.of());
+        prepararPedidoExistente(incoming, existente);
+        when(itemRepository.findByPedido(existente)).thenReturn(List.of(orfao));
+        when(divergenciaRepository.existsByConferencia_Pedido_IdAndCodigoMaterial(
+                existente.getId(), "MAT-HISTORICO")).thenReturn(true);
+
+        pedidoService.upsert(incoming);
+
+        verify(itemRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Linha órfã sem recebimento é removida quando não há divergência daquele material")
+    void upsert_linhaOrfaSemDivergenciaDoMaterial_remove() {
+        Fornecedor fornecedor = fornecedorPersistido("12345678000190", "Fornecedor");
+        Pedido existente = pedidoPersistido("AL-011", fornecedor);
+        Item orfao = itemTransiente("1", "MAT-ORFAO");
+        orfao.setPedido(existente);
+        orfao.setQuantidadeRecebida(BigDecimal.ZERO);
+
+        Pedido incoming = pedidoTransiente("AL-011", fornecedorTransiente(fornecedor.getCnpj(), fornecedor.getNome()),
+                List.of());
+        prepararPedidoExistente(incoming, existente);
+        when(itemRepository.findByPedido(existente)).thenReturn(List.of(orfao));
+        when(divergenciaRepository.existsByConferencia_Pedido_IdAndCodigoMaterial(
+                existente.getId(), "MAT-ORFAO")).thenReturn(false);
+
+        pedidoService.upsert(incoming);
+
+        verify(itemRepository).delete(orfao);
+    }
+
+    private void prepararPedidoExistente(Pedido incoming, Pedido existente) {
+        when(fornecedorRepository.findByCnpj(any())).thenReturn(Optional.of(existente.getFornecedor()));
+        when(fornecedorRepository.save(any())).thenReturn(existente.getFornecedor());
+        when(pedidoRepository.findByNumeroPedidoOrigemAndClienteOrigem(
+                existente.getNumeroPedidoOrigem(), "ALFA")).thenReturn(Optional.of(existente));
+        when(pedidoRepository.save(existente)).thenReturn(existente);
+        when(pedidoRepository.findById(existente.getId())).thenReturn(Optional.of(existente));
     }
 }

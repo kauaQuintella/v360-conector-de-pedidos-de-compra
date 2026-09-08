@@ -3,6 +3,7 @@ package com.v360.prosel.conectorpedidoscompra.service;
 import com.v360.prosel.conectorpedidoscompra.entity.Fornecedor;
 import com.v360.prosel.conectorpedidoscompra.entity.Item;
 import com.v360.prosel.conectorpedidoscompra.entity.Pedido;
+import com.v360.prosel.conectorpedidoscompra.repository.DivergenciaRepository;
 import com.v360.prosel.conectorpedidoscompra.repository.FornecedorRepository;
 import com.v360.prosel.conectorpedidoscompra.repository.ItemRepository;
 import com.v360.prosel.conectorpedidoscompra.repository.PedidoRepository;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Serviço responsável pelo upsert de pedidos de compra.
@@ -29,6 +31,7 @@ public class PedidoService {
     private final PedidoRepository pedidoRepository;
     private final FornecedorRepository fornecedorRepository;
     private final ItemRepository itemRepository;
+    private final DivergenciaRepository divergenciaRepository;
 
     /**
      * Recebe um Pedido transiente (montado pelo Ingestor) e realiza o upsert completo:
@@ -45,6 +48,7 @@ public class PedidoService {
         Fornecedor fornecedor = resolverFornecedor(incoming.getFornecedor());
         Pedido pedido = resolverPedido(incoming, fornecedor);
         resolverItens(itens, pedido);
+        removerOrfaos(pedido, linhasRecebidas(itens));
         return pedidoRepository.findById(pedido.getId()).orElse(pedido);
     }
 
@@ -105,6 +109,40 @@ public class PedidoService {
                             existente -> atualizarItem(existente, incoming),
                             () -> criarItem(incoming, pedido)
                     );
+        }
+    }
+
+    private Set<String> linhasRecebidas(List<Item> itensEntrada) {
+        return itensEntrada.stream()
+                .map(Item::getLinha)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    /**
+     * Remove somente linhas que desapareceram do payload e ainda não têm
+     * movimentação ou histórico fiscal. O arquivo novo é a fonte de verdade
+     * para linhas sem histórico; linhas movimentadas são preservadas.
+     */
+    private void removerOrfaos(Pedido pedido, Set<String> linhasRecebidas) {
+        List<Item> persistidos = itemRepository.findByPedido(pedido);
+        if (persistidos == null || persistidos.isEmpty()) {
+            return;
+        }
+
+        for (Item item : persistidos) {
+            if (linhasRecebidas.contains(item.getLinha())) {
+                continue;
+            }
+
+            boolean possuiRecebimento = item.getQuantidadeRecebida() != null
+                    && item.getQuantidadeRecebida().compareTo(java.math.BigDecimal.ZERO) > 0;
+            boolean possuiDivergencia = pedido.getId() != null
+                    && divergenciaRepository.existsByConferencia_Pedido_IdAndCodigoMaterial(
+                    pedido.getId(), item.getCodigoMaterial());
+
+            if (!possuiRecebimento && !possuiDivergencia) {
+                itemRepository.delete(item);
+            }
         }
     }
 
