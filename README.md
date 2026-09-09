@@ -8,28 +8,37 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 
 *   **Spring Web:** Criação dos endpoints REST.
 *   **Spring Data JPA:** Persistência de dados utilizando o padrão Repository.
-*   **H2 Database:** Banco de dados em memória para execução simplificada e testes rápidos.
-*   **PostgreSQL Driver:** Configurado para escalar a persistência em ambientes de produção.
+*   **PostgreSQL:** Banco de dados principal. A aplicação usa Postgres desde o primeiro dia via `compose.yaml` 
+    (variáveis de ambiente configuradas em .env).
 *   **Lombok:** Redução de boilerplate (getters, setters, construtores).
 *   **Validation (Hibernate Validator):** Garantia de integridade dos payloads recebidos.
-*   **OpenCSV:** Escolhido para o parse do cliente Beta pela facilidade de mapeamento via POJO.
-*   **Docker Compose Support:** Facilita a subida da infraestrutura completa.
+*   **OpenCSV:** Escolhido para o parse do cliente Beta pela facilidade de mapeamento via POJO (`@CsvBindByPosition`).
+*   **Docker Compose Support:** Facilita a subida da infraestrutura completa (Postgres 17 + app + pgAdmin).
 
 ## Como rodar o projeto
 
 ### Opção 1: Via Docker (Recomendado)
-1. Certifique-se de ter o Docker e o Docker Compose instalados.
+1. Certifique-se de ter o Java 21, Docker e o Docker Compose instalados.
+2. Configure as variáveis de ambiente de conexão ao banco (host, porta, usuário, senha) inserindo o arquivo .env 
+   modelo na raiz do projeto.
 2. Na raiz do projeto, execute:
 ```bash
-   docker-compose up --build
+   docker-compose up -d --build
 ```
-3. A API estará disponível em `http://localhost:8080`.
+3. Você pode acessar os seguintes links para acessar a API:
+   - **API:** `http://localhost:8080`
+   - **pgAdmin:** `http://localhost:5050`
+   - **Swagger:** `http://localhost:8080/swagger-ui.html`
+
+> As credenciais e a URL do banco são gerenciadas pelas variáveis de ambiente definidas no `.env` que são usadas 
+> pelo `compose.yaml`. Não é necessário configurar nada manualmente.
 
 ### Opção 2: Localmente (IDE ou Terminal)
 
-1. Certifique-se de ter o Java instalado.
+1. Certifique-se de ter o Java 21 instalado e um servidor PostgreSQL acessível.
 2. Clone o repositório e navegue até a pasta raiz.
-3. O banco H2 já está configurado por padrão no `application.properties`.
+3. Configure as variáveis de ambiente de conexão ao banco (host, porta, usuário, senha) inserindo o arquivo .env
+   modelo na raiz do projeto.
 4. Execute o comando:
 
 ```bash
@@ -38,21 +47,129 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 
 ## Arquitetura e Decisões Técnicas
 
-Para garantir que a adição de novos clientes não quebrasse o código existente, optei por uma arquitetura inspirada em **Pipes and Filters**, orquestrada pelos padrões **Strategy** e **Factory**.
+Para garantir que a adição de novos clientes não quebrasse o código existente, optei por uma arquitetura em camadas com ingestão no estilo **Pipes and Filters**, orquestrada pelo padrão **Strategy**.
 
-* **Ingestão e Normalização:** Cada cliente possui rotas específicas. O dado bruto entra, é validado e processado por um "tradutor" isolado antes de ser salvo no modelo único.
-* **Gama (Parte 2) — só adicionar:** `POST /ingest/gama` (array JSON), `GamaItemLinhaDTO`, `GamaPedidoDTO`, `GamaPayloadAgrupador`, `GamaIngestor`, `GamaDateParser`, `GamaStatusMapper`, `UnitConverter`. Alfa, Beta, conferência e `PedidoService` não foram alterados.
-* **Gama — decisões:** moeda `BRL` (o payload não informa); persistir unidade da nota como `UN` (`um` do JSON é unidade de compra); converter `qtd_ped` **e** `qtd_rec` por `fator_conv`; agrupador separado do ingestor (mesmo papel do join do Beta). `GamaStatusMapper` não implementa `StatusMapper` (`map(String)` vs. situação `Integer`).
-* **
+* **Ingestão e Normalização:** Cada cliente possui rotas dedicadas. O dado bruto entra, é validado pelo `@Valid` no controller, processado por um parser/agrupador e traduzido por um ingestor isolado antes de ser salvo no modelo único via `PedidoService`.
+* **Factory dispensada:** há uma rota por cliente; o Spring injeta o ingestor correto no controller correspondente.
+* **Open/Closed na prática:** a adição da Gama (Parte 2) foi 100% aditiva — `GamaItemLinhaDTO`, `GamaPedidoDTO`, `GamaPayloadAgrupador`, `GamaDateParser`, `GamaStatusMapper`, `UnitConverter`, `GamaIngestor` e `GamaController` foram criados sem alterar Alfa, Beta, conferência, schema ou `PedidoService`.
+
+### Fluxo ponta a ponta
+
+```
+Alfa (JSON aninhado)     Beta (CSV 2 arquivos)     Gama (JSON achatado)
+        |                        |                          |
+   POST /ingest/alfa      POST /ingest/beta         POST /ingest/gama
+        |                        |                          |
+    AlfaIngestor       BetaCsvParser → BetaIngestor     GamaPayloadAgrupador → GamaIngestor
+        |                        |                          |
+        +------------------------+--------------------------+
+                                  |
+                 Normalizadores (CNPJ, status, data, string, unidade)
+                                  |
+                            PedidoService (upsert por numero_pedido_origem + cliente_origem)
+                                  |
+                              PostgreSQL
+        (Fornecedor, Pedido, Item, Conferencia, Divergencia)
+                                  |
+        +-------------------------+-------------------------+
+        |                         |                         |
+    Consulta               Conferência                Relatório
+  GET /pedidos          POST /notas-fiscais/      GET /relatorios/
+  GET /pedidos/{id}          conferir               conferencias
+```
+
+### Normalizadores
+
+| Peça | Uso |
+|---|---|
+| `CnpjSanitizer` | Compartilhado por Alfa, Beta e Gama — só dígitos no contrato |
+| `StringSanitizer` | Remove `\n`, `\r`, `\t` e faz trim — reutilizado pelo Gama |
+| `AlfaStatusMapper` | `open/closed/blocked` → enum `OPEN/CLOSED/BLOCKED` |
+| `BetaStatusMapper` | `"EM ABERTO"/"BLOQUEADO"/"ENCERRADO"` → enum |
+| `GamaStatusMapper` | Inteiro `1/2/3` → `OPEN/CLOSED/BLOCKED`; **não** implementa a interface `StatusMapper` (que é `map(String)`) — assimetria consciente |
+| `AlfaDateParser` | `YYYY-MM-DD` (`LocalDate`) → `Instant` (`America/Sao_Paulo`) |
+| `BetaDateParser` | `dd/MM/yyyy` → `Instant` |
+| `BetaNumberParser` | Número BR (`1.200,000` / `6,49`) → `BigDecimal` |
+| `GamaDateParser` | Epoch segundos (`Long`) → `Instant.ofEpochSecond`; null-safe |
+| `UnitConverter` | `qtd × fator_conv` (pedida **e** recebida); `(centavos/100) / fator_conv` (preço, escala 4, `HALF_UP`) |
+
+### Particularidades por cliente
+
+| Cliente | Formato | Conversões principais |
+|---|---|---|
+| **Alfa Energia** | JSON aninhado (lote em `purchase_orders`) | `created_at` é `YYYY-MM-DD` (não ISO com horário); `StringSanitizer` no nome do fornecedor |
+| **Beta Alimentos** | CSV duplo (`;`, padrão BR) — `cabecalho.csv` + `itens.csv` | Join por `NUMERO_PEDIDO`; CSV não é RFC 4180 — tratado por `BetaCsvRecordAssembler` (máquina de estados + lookahead) |
+| **Gama Logística** | JSON achatado (array: 1 objeto = 1 linha de item) | `dt_criacao` em epoch segundos; `preco_unit_centavos`; `situacao` numérica; `fator_conv`; unidade persistida como `"UN"` (campo `um` do JSON é unidade de compra, não vai ao banco); moeda constante `"BRL"` |
+
+## Modelo de dados único (contrato de saída)
+
+```json
+{
+  "id_pedido": "uuid",
+  "numero_pedido": "GL-778",
+  "cliente_origem": "GAMA",
+  "data_criacao": "2026-08-15T00:00:00Z",
+  "status": "OPEN",
+  "moeda": "BRL",
+  "fornecedor": {
+    "id_fornecedor": "uuid",
+    "cnpj": "34567890000112",
+    "nome": "Transportes Ideal ME"
+  },
+  "itens": [
+    {
+      "id_item": "uuid",
+      "linha": "1",
+      "codigo_material": "TRP-01",
+      "descricao": "Pallet de madeira",
+      "unidade_medida": "UN",
+      "quantidade_pedida": 120,
+      "quantidade_recebida": 24,
+      "quantidade_pendente": 96,
+      "preco_unitario": 100.00
+    }
+  ]
+}
+```
+
+> **Nota:** `quantidade_pendente` é uma **coluna gerada** no banco (`GENERATED ALWAYS AS (quantidade_pedida - quantidade_recebida) STORED`). O JPA não escreve nesse campo (`insertable = false, updatable = false`). O valor só existe após leitura do PostgreSQL.
+
+> **Nota:** O `POST /ingest/*` devolve `numero_pedido_origem`; a consulta `GET /pedidos/{id}` devolve `numero_pedido`. São o mesmo dado com nomes ligeiramente diferentes.
+
+> **Nota:** `Fornecedor.cnpj` é `UNIQUE` global — o mesmo CNPJ vindo de Alfa, Beta ou Gama corresponde à mesma entidade. O `PedidoService` atualiza o nome se o CNPJ já existir.
 
 ## Regras de Negócio e Divergências (Conferência de Notas)
 
-No endpoint de conferência de notas fiscais, as seguintes regras foram estabelecidas:
+O endpoint `POST /notas-fiscais/conferir` cruza a nota fiscal com o pedido armazenado e persiste o resultado (tabelas `Conferencia` e `Divergencia`).
 
-* 
+### Tipos de divergência
+
+| Tipo | Quando ocorre |
+|---|---|
+| `PEDIDO_NAO_ENCONTRADO` | Número do pedido da nota não existe na base |
+| `FORNECEDOR_DIVERGENTE` | CNPJ da nota ≠ CNPJ do pedido |
+| `MATERIAL_NAO_ENCONTRADO` | Material da nota não está nos itens do pedido |
+| `QUANTIDADE_EXCEDE_PENDENTE` | Quantidade da nota > soma das `quantidade_pendente` daquele `codigo_material` |
+| `VALOR_DIVERGENTE` | `\|valor_nota − (quantidade × preço_unitário)\| > R$ 0,05` |
+| `PEDIDO_BLOQUEADO` | Pedido está `BLOCKED` — registra e **continua** |
+| `PEDIDO_ENCERRADO` | Pedido está `CLOSED` — registra e **continua** |
+
+### Decisões de conferência
+
+1. **Tolerância absoluta de R$ 0,05:** a comparação de valor usa `BigDecimal`. A margem absoluta cobre resíduos de arredondamento gerados na conversão do Gama (centavos + `fator_conv`) sem mascarar erros materiais.
+
+2. **Avaliação completa (sem `return` antecipado):** `BLOCKED` e `CLOSED` não abortam a conferência. Todas as divergências são acumuladas em uma lista e devolvidas de uma vez — evita o efeito ioiô onde o operador corrigi um problema só para descobrir o próximo. Única exceção: `PEDIDO_NAO_ENCONTRADO` encerra o cruzamento de linhas (sem pedido não há itens para verificar).
+
+3. **Agregação por material:** os itens do pedido são agrupados por `codigo_material` e as `quantidade_pendente` são somadas. A nota é cruzada contra esse saldo agregado, não linha a linha. Preço de referência: ponderado pelo pendente quando há mais de uma linha do mesmo material.
+
 ## O que eu faria diferente com mais tempo
 
-* 
+* **Testes de integração com PostgreSQL:** a suíte atual (~150 métodos em 22 classes) é unitária. A coluna `GENERATED` de `quantidade_pendente` e o upsert real não são exercitados por nenhum teste de integração. Usaria Testcontainers para cobrir esse fluxo.
+* **`JOIN FETCH` na conferência:** o `ConferenciaService` usa lazy load dentro de `@Transactional`, o que gera N+1. A consulta de detalhe já usa `JOIN FETCH`; replicaria esse padrão na conferência.
+* **Remover `orphanRemoval = true`:** a anotação ainda está no mapeamento de `Pedido`, mas o delete de órfãos é feito de forma explícita e condicional no `PedidoService`. A anotação é uma armadilha para futuras refatorações.
+* **Idempotência no relatório:** reprocessar a mesma nota fiscal infla os totais de `GET /relatorios/conferencias`. Adicionaria uma chave de idempotência na conferência.
+* **`git tag parte-1`:** o enunciado pede essa tag explicitamente — não foi criada a tempo.
+
 ---
 
 *Nota: Para detalhes sobre o uso de Inteligência Artificial durante o desenvolvimento, consulte o arquivo `AI_USAGE.md`.*
