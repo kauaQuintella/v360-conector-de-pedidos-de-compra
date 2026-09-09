@@ -21,7 +21,7 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 1. Certifique-se de ter o Docker e o Docker Compose instalados.
 2. Na raiz do projeto, execute:
 ```bash
-   docker-compose up --build
+   docker-compose up -d --build
 ```
 3. A API estará disponível em `http://localhost:8080`.
 
@@ -38,19 +38,8 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 
 ## Arquitetura e Decisões Técnicas
 
-Para garantir que a adição de novos clientes não quebrasse o código existente, optei por uma arquitetura inspirada em **Pipes and Filters**, orquestrada pelos padrões **Strategy** e **Factory**.
-
-* **Ingestão e Normalização:** Cada cliente possui rotas específicas. O dado bruto entra, é validado e processado por um "tradutor" isolado antes de ser salvo no modelo único.
-* **
-
-## Regras de Negócio e Divergências (Conferência de Notas)
-
-No endpoint de conferência de notas fiscais, as seguintes regras foram estabelecidas:
-
-* 
 ## O que eu faria diferente com mais tempo
 
-* 
----
+
 
 *Nota: Para detalhes sobre o uso de Inteligência Artificial durante o desenvolvimento, consulte o arquivo `AI_USAGE.md`.*
