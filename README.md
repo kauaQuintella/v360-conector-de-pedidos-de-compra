@@ -41,6 +41,8 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 Para garantir que a adição de novos clientes não quebrasse o código existente, optei por uma arquitetura inspirada em **Pipes and Filters**, orquestrada pelos padrões **Strategy** e **Factory**.
 
 * **Ingestão e Normalização:** Cada cliente possui rotas específicas. O dado bruto entra, é validado e processado por um "tradutor" isolado antes de ser salvo no modelo único.
+* **Gama (Parte 2) — só adicionar:** `POST /ingest/gama` (array JSON), `GamaItemLinhaDTO`, `GamaPedidoDTO`, `GamaPayloadAgrupador`, `GamaIngestor`, `GamaDateParser`, `GamaStatusMapper`, `UnitConverter`. Alfa, Beta, conferência e `PedidoService` não foram alterados.
+* **Gama — decisões:** moeda `BRL` (o payload não informa); persistir unidade da nota como `UN` (`um` do JSON é unidade de compra); converter `qtd_ped` **e** `qtd_rec` por `fator_conv`; agrupador separado do ingestor (mesmo papel do join do Beta). `GamaStatusMapper` não implementa `StatusMapper` (`map(String)` vs. situação `Integer`).
 * **
 
 ## Regras de Negócio e Divergências (Conferência de Notas)
