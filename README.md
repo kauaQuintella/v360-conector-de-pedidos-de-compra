@@ -21,6 +21,19 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 1. Certifique-se de ter o Java 21, Docker e o Docker Compose instalados.
 2. Configure as variáveis de ambiente de conexão ao banco (host, porta, usuário, senha) inserindo o arquivo .env 
    modelo na raiz do projeto.
+```bash
+   POSTGRES_DB=mydatabase
+   POSTGRES_USER=myuser
+   POSTGRES_PASSWORD=secret
+   POSTGRES_PORT=5432
+   
+   APP_PORT=8080
+   
+   PGADMIN_DEFAULT_EMAIL=admin@admin.com
+   PGADMIN_DEFAULT_PASSWORD=admin
+   PGADMIN_DEFAULT_PORT=5050
+
+```
 2. Na raiz do projeto, execute:
 ```bash
    docker-compose up -d --build
@@ -32,18 +45,6 @@ A aplicação foi construída em **Java 21** com **Spring Boot**, utilizando as 
 
 > As credenciais e a URL do banco são gerenciadas pelas variáveis de ambiente definidas no `.env` que são usadas 
 > pelo `compose.yaml`. Não é necessário configurar nada manualmente.
-
-### Opção 2: Localmente (IDE ou Terminal)
-
-1. Certifique-se de ter o Java 21 instalado e um servidor PostgreSQL acessível.
-2. Clone o repositório e navegue até a pasta raiz.
-3. Configure as variáveis de ambiente de conexão ao banco (host, porta, usuário, senha) inserindo o arquivo .env
-   modelo na raiz do projeto.
-4. Execute o comando:
-
-```bash
-   ./mvnw spring-boot:run
-```
 
 ## Arquitetura e Decisões Técnicas
 
@@ -164,12 +165,13 @@ O endpoint `POST /notas-fiscais/conferir` cruza a nota fiscal com o pedido armaz
 
 ## O que eu faria diferente com mais tempo
 
-* **Testes de integração com PostgreSQL:** a suíte atual (~150 métodos em 22 classes) é unitária. A coluna `GENERATED` de `quantidade_pendente` e o upsert real não são exercitados por nenhum teste de integração. Usaria Testcontainers para cobrir esse fluxo.
-* **`JOIN FETCH` na conferência:** o `ConferenciaService` usa lazy load dentro de `@Transactional`, o que gera N+1. A consulta de detalhe já usa `JOIN FETCH`; replicaria esse padrão na conferência.
-* **Remover `orphanRemoval = true`:** a anotação ainda está no mapeamento de `Pedido`, mas o delete de órfãos é feito de forma explícita e condicional no `PedidoService`. A anotação é uma armadilha para futuras refatorações.
-* **Idempotência no relatório:** reprocessar a mesma nota fiscal infla os totais de `GET /relatorios/conferencias`. Adicionaria uma chave de idempotência na conferência.
-* **`git tag parte-1`:** o enunciado pede essa tag explicitamente — não foi criada a tempo.
-
+* Divisão de contexto de IA em sub-tasks;
+* Desenvolver projeto baseado em testes e pontos de falha;
+* Camada de autenticação (OAuth2/JWT) para proteger as rotas de ingestão e garantir que apenas clientes autorizados 
+  possam enviar dados.
+* Controle de Concorrência para prevenir condições de corrida (*race conditions*)
+* Processamento Assíncrono e Mensageria para lidar com picos de tráfego e arquivos 
+  CSV/JSON gigantes.
 ---
 
 *Nota: Para detalhes sobre o uso de Inteligência Artificial durante o desenvolvimento, consulte o arquivo `AI_USAGE.md`.*

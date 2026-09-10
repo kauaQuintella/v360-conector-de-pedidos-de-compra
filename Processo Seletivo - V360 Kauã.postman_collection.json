@@ -1,0 +1,3459 @@
+{
+  "info": {
+    "_postman_id": "bc9cc8e0-e7e8-4c22-99f1-e2d4cc81b53a",
+    "name": "Processo Seletivo - V360 Kauã",
+    "description": "Coleção padronizada e detalhada para o desafio V360 — Conector de Pedidos de Compra.\n\nConvenções aplicadas em TODAS as requisições desta coleção:\n- URL usa a variável de coleção {{base_url}} (padrão http://localhost:8080) em vez de host fixo.\n- Cada requisição tem uma descrição padronizada: Objetivo / Pré-requisito / Regra validada (com referência ao DESING_V3.md) / Resultado esperado.\n- Cada requisição tem um script de teste (aba Tests) com pm.test(...) checando pelo menos o status HTTP esperado; muitas também checam campos específicos da resposta.\n- Os testes que dependem de negócio incerto na resposta (ex.: nome exato do campo que carrega o tipo de divergência) usam JSON.stringify(pm.response.json()).includes(\"VALOR\") — uma checagem tolerante ao formato exato do DTO, já que o schema completo de ConferenciaResponseDTO não estava nos arquivos do projeto compartilhados. Ajuste para checagens de campo exato (pm.expect(body.campo)...) assim que quiser travar o contrato.\n- IDs de pedido que antes exigiam copiar/colar manualmente (ex. \"COLE_AQUI_O_ID_DO_GL-778\") agora são capturados automaticamente em variáveis de coleção (id_gl778, id_gl779, id_pedido_sem_pendencia) pelo teste da requisição de criação e reaproveitados nas requisições de detalhe seguintes.\n- Corrigido: vários bodies em testAlfa e testNotasFiscais continham comentários estilo `// ...` dentro do JSON. JSON não suporta comentários — enviados como estavam, esses requests quebravam por JSON malformado antes mesmo de testar a regra de negócio pretendida. Os comentários foram extraídos para a descrição de cada requisição (seção 'Notas do payload') e o body agora é JSON válido.\n- Renomeados os requests de testNotasFiscais que tinham \"-error-\" no nome mas cujo comportamento correto é 200 OK + resultado REJEITADA (divergência de negócio, não erro HTTP) — ver DESING_V3.md §5.3 Decisão 2. O único 400 genuíno da pasta é o de cliente_origem vazio (Bean Validation).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "48584912",
+    "_collection_link": "https://go.postman.co/collection/48584912-bc9cc8e0-e7e8-4c22-99f1-e2d4cc81b53a?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "testBeta",
+      "item": [
+        {
+          "name": "primeiro-pedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                  "pm.test(\"Array tem pelo menos 1 elemento(s)\", function () { pm.expect(pm.response.json().length).to.be.at.least(1); });",
+                  "pm.test(\"Algum item tem cliente_origem = 'BETA'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const arr = Array.isArray(body) ? body : [body];",
+                  "    pm.expect(arr.some(p => p[\"cliente_origem\"] === \"BETA\")).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cabecalho",
+                  "type": "file",
+                  "uuid": "f00a4f9c-f0fc-4bcc-ba2f-f1db310726dd",
+                  "src": "/home/kauaqpo/Documents/GitHub/conectorpedidoscompra/public/betaAlimentos/cabecalho.csv"
+                },
+                {
+                  "key": "itens",
+                  "type": "file",
+                  "uuid": "ae6b8618-bf7a-4490-985e-a4e203cb8940",
+                  "src": "/home/kauaqpo/Documents/GitHub/conectorpedidoscompra/public/betaAlimentos/itens.csv"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/beta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "beta"
+              ]
+            },
+            "description": "**Objetivo:** Ingerir o payload oficial do cliente Beta (2 arquivos CSV, não-RFC4180) e confirmar criação dos pedidos.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §6 (Beta Alimentos) — BetaCsvRecordAssembler / BetaCsvParser / BetaIngestor.\n\n**Resultado esperado:** 200 OK; resposta é um array no mesmo formato de Alfa/Gama (id_pedido, numero_pedido_origem, cliente_origem=\"BETA\", status).\n\n**Contexto original:** criar pedido que foi enviado no escopo do desafio;\n\nAnalisar se existe alguma inconsistência nos dados persistidos via pgAdmin4.\n\nProvar que o parser lida com o formato não-RFC4180 de verdade, não com uma versão limpa que mascare o problema."
+          },
+          "response": []
+        },
+        {
+          "name": "upsert-updatecampos-primeiropedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cabecalho",
+                  "type": "file",
+                  "uuid": "bceda189-3c07-4b19-a597-8eb521379b98",
+                  "src": "/home/kauaqpo/Documents/GitHub/conectorpedidoscompra/public/betaAlimentos/testUpsert/cabecalho-upsert.csv"
+                },
+                {
+                  "key": "itens",
+                  "type": "file",
+                  "uuid": "3d5917ba-5e63-43b4-a3db-8d1fb07e28f8",
+                  "src": "/home/kauaqpo/Documents/GitHub/conectorpedidoscompra/public/betaAlimentos/testUpsert/itens-upsert.csv"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/beta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "beta"
+              ]
+            },
+            "description": "**Objetivo:** Reenviar o pedido do Beta com campos de item e fornecedor alterados, validando upsert (não duplicar) e fornecedor global único (mesmo CNPJ do Alfa).\n\n**Pré-requisito:** Rodar testBeta/primeiro-pedido e testAlfa/primeiro-pedido antes.\n\n**Regra validada:** DESING_V3.md §3.5 (upsert) e §3.2 (Fornecedor.cnpj UNIQUE global).\n\n**Resultado esperado:** 200 OK. Verificar manualmente via GET /pedidos que não duplicou o pedido nem o fornecedor.\n\n**Contexto original:** Fazer upsert em cima do primeiro-pedido e atualizar campos dos itens e do fornecedor no banco de dados;\n\nFornecedor com o **mesmo CNPJ** que já existe do Alfa → confirmar que reaproveita o `Fornecedor` (unicidade global) em vez de duplicar cadastro."
+          },
+          "response": []
+        },
+        {
+          "name": "badfile-error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 500\", function () { pm.response.to.have.status(500); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cabecalho",
+                  "type": "file",
+                  "uuid": "bceda189-3c07-4b19-a597-8eb521379b98",
+                  "src": "/home/kauaqpo/Documents/GitHub/conectorpedidoscompra/public/betaAlimentos/testBadFile/cabecalho-bad-file.csv"
+                },
+                {
+                  "key": "itens",
+                  "type": "file",
+                  "uuid": "3d5917ba-5e63-43b4-a3db-8d1fb07e28f8",
+                  "src": "/home/kauaqpo/Documents/GitHub/conectorpedidoscompra/public/betaAlimentos/testBadFile/itens-bad-file.csv"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/beta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "beta"
+              ]
+            },
+            "description": "**Objetivo:** Enviar CSVs propositalmente inválidos para o parser do Beta.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §6, nota de atenção final: erros de parse/join do Beta lançam IllegalArgumentException não tratada por ApiExceptionHandler → 500, não 400 padronizado (débito técnico conhecido).\n\n**Resultado esperado:** 500 Internal Server Error (comportamento atual documentado; considerar handler dedicado se houver tempo).\n\n**Contexto original:** Fazer upsert em cima do primeiro-pedido e atualizar campos dos itens e do fornecedor no banco de dados;\n\nDeve dar erro 500."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "testAlfa",
+      "item": [
+        {
+          "name": "primeiro-pedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                  "pm.test(\"Array tem 1 elemento(s)\", function () { pm.expect(pm.response.json()).to.have.lengthOf(1); });",
+                  "pm.test(\"Algum item tem numero_pedido_origem = '4500001234'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const arr = Array.isArray(body) ? body : [body];",
+                  "    pm.expect(arr.some(p => p[\"numero_pedido_origem\"] === \"4500001234\")).to.be.true;",
+                  "});",
+                  "pm.test(\"Algum item tem cliente_origem = 'ALFA'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const arr = Array.isArray(body) ? body : [body];",
+                  "    pm.expect(arr.some(p => p[\"cliente_origem\"] === \"ALFA\")).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n      \"po_number\": \"4500001234\",\n      \"created_at\": \"2026-08-05\",\n      \"status\": \"open\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"23456789000101\",\n        \"name\": \"Metalúrgica São Jorge\\nS.A.\"\n      },\n      \"items\": [\n        {\n          \"line\": 10,\n          \"material\": \"MAT-1001\",\n          \"description\": \"Chapa de aço 2mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 100,\n          \"quantity_received\": 60,\n          \"unit_price\": 45.9\n        },\n        {\n          \"line\": 20,\n          \"material\": \"MAT-1002\",\n          \"description\": \"Perfil U 3m\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 50,\n          \"quantity_received\": 0,\n          \"unit_price\": 128.75\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Ingerir o payload oficial do cliente Alfa (JSON aninhado, lote em purchase_orders) e confirmar criação do pedido 4500001234.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §6 (Alfa Energia) — AlfaDateParser, StringSanitizer no nome do fornecedor.\n\n**Resultado esperado:** 200 OK; array com 1 pedido; numero_pedido_origem=\"4500001234\"; cliente_origem=\"ALFA\".\n\n**Contexto original:** criar pedido que foi enviado no escopo do desafio"
+          },
+          "response": []
+        },
+        {
+          "name": "erro-send-pedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n\n      \"created_at\": \"2026-08-05\",\n      \"status\": \"open\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"23456789000101\",\n        \"name\": \"Metalúrgica São Jorge\\nS.A.\"\n      },\n      \"items\": [\n        {\n          \"line\": 10,\n          \"material\": \"MAT-1001\",\n          \"description\": \"Chapa de aço 2mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 100,\n          \"quantity_received\": 60,\n          \"unit_price\": 45.9\n        },\n        {\n          \"line\": 20,\n          \"material\": \"MAT-1002\",\n          \"description\": \"Perfil U 3m\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 50,\n          \"quantity_received\": 0,\n          \"unit_price\": 128.75\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Enviar pedido Alfa sem o campo obrigatório po_number.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em AlfaPedidoDTO (@NotBlank/@NotNull em po_number).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Notas do payload (removidas do body para manter o JSON válido):** sem po_number\n\n**Contexto original:** criar pedido que foi enviado no escopo do desafio"
+          },
+          "response": []
+        },
+        {
+          "name": "segundo-pedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                  "pm.test(\"Array tem 1 elemento(s)\", function () { pm.expect(pm.response.json()).to.have.lengthOf(1); });",
+                  "pm.test(\"Algum item tem numero_pedido_origem = '6500001234'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const arr = Array.isArray(body) ? body : [body];",
+                  "    pm.expect(arr.some(p => p[\"numero_pedido_origem\"] === \"6500001234\")).to.be.true;",
+                  "});",
+                  "pm.test(\"Resposta contém o valor 'CLOSED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"CLOSED\\\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n      \"po_number\": \"6500001234\",\n      \"created_at\": \"2026-12-16\",\n      \"status\": \"closed\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"25111789000101\",\n        \"name\": \"Metalúrgica São Pedro\\nS.A.\"\n      },\n      \"items\": [\n        {\n          \"line\": 1,\n          \"material\": \"CAT-2001\",\n          \"description\": \"Placa cobre 5mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 100,\n          \"quantity_received\": 60,\n          \"unit_price\": 45.9\n        },\n        {\n          \"line\": 2,\n          \"material\": \"CAT-2002\",\n          \"description\": \"Perfil U 3m\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 50,\n          \"quantity_received\": 0,\n          \"unit_price\": 128.75\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Criar um segundo pedido Alfa (6500001234, status closed) e confirmar que não sobrescreve o primeiro (4500001234).\n\n**Pré-requisito:** Rodar testAlfa/primeiro-pedido antes, para comparar depois via GET /pedidos.\n\n**Regra validada:** DESING_V3.md §3.5 — upsert por (numero_pedido_origem, cliente_origem); chaves diferentes ⇒ registros distintos.\n\n**Resultado esperado:** 200 OK; array com 1 pedido; numero_pedido_origem=\"6500001234\"; status=\"CLOSED\".\n\n**Notas do payload (removidas do body para manter o JSON válido):** update here; update here; update here; update here; update here; update here; update here; update here\n\n**Contexto original:** Novo pedido deve ser criado sem sobrescrever outro"
+          },
+          "response": []
+        },
+        {
+          "name": "upsert-updatecampos-primeiropedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Algum item tem numero_pedido_origem = '4500001234'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const arr = Array.isArray(body) ? body : [body];",
+                  "    pm.expect(arr.some(p => p[\"numero_pedido_origem\"] === \"4500001234\")).to.be.true;",
+                  "});",
+                  "pm.test(\"Resposta contém o valor 'CLOSED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"CLOSED\\\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"purchase_orders\": [\n        {\n            \"po_number\": \"4500001234\",\n            \"created_at\": \"2026-08-05\",\n            \"status\": \"closed\",\n            \"currency\": \"USD\",\n            \"vendor\": {\n                \"tax_id\": \"23456789000101\",\n                \"name\": \"Metalúrgica\\nSão José\\nS.A.\"\n            },\n            \"items\": [\n                {\n                    \"line\": 10,\n                    \"material\": \"MAT-1001\",\n                    \"description\": \"Chapa de bronze 2mm\",\n                    \"uom\": \"UN\",\n                    \"quantity_ordered\": 200,\n                    \"quantity_received\": 100,\n                    \"unit_price\": 10.30\n                },\n                {\n                    \"line\": 20,\n                    \"material\": \"MAT-1002\",\n                    \"description\": \"Perfil\\nU 4m\",\n                    \"uom\": \"UN\",\n                    \"quantity_ordered\": 130,\n                    \"quantity_received\": 0,\n                    \"unit_price\": 20.90\n                }\n            ]\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Reenviar o pedido 4500001234 com status, moeda, descrições e quantidades alteradas, validando upsert de campos escalares do Pedido e dos Itens.\n\n**Pré-requisito:** Rodar testAlfa/primeiro-pedido antes.\n\n**Regra validada:** DESING_V3.md §3.5 (upsert via find+save) e §3.4 (quantidade_pendente é coluna GENERATED — conferir depois via GET, não neste POST).\n\n**Resultado esperado:** 200 OK; status=\"CLOSED\". Conferir manualmente via GET /pedidos/{id} que quantidade_pendente = quantidade_pedida − quantidade_recebida para os 2 itens.\n\n**Notas do payload (removidas do body para manter o JSON válido):** change here; change here; change here; change here; change here; change here; change here; change here; change here; change here\n\n**Contexto original:** Fazer upsert em cima do primeiro-pedido e atualizar campos dos itens e do fornecedor no banco de dados;  \n  \nVerificar também campo quantidade pendente se, de fato, foi atualizado de acordo com quantidade-pedida - quantidade-recebida;"
+          },
+          "response": []
+        },
+        {
+          "name": "upsert-removeitem-primeiropedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"purchase_orders\": [\n        {\n            \"po_number\": \"4500001234\",\n            \"created_at\": \"2026-08-05\",\n            \"status\": \"open\",\n            \"currency\": \"BRL\",\n            \"vendor\": {\n                \"tax_id\": \"23456789000101\",\n                \"name\": \"Metalúrgica São Jorge\\nS.A.\"\n            },\n            \"items\": [\n                {\n                    \"line\": 10,\n                    \"material\": \"MAT-1001\",\n                    \"description\": \"Chapa de aço 2mm\",\n                    \"uom\": \"UN\",\n                    \"quantity_ordered\": 100,\n                    \"quantity_received\": 60,\n                    \"unit_price\": 45.9\n                }\n            ]\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Reenviar o pedido 4500001234 apenas com o item MAT-1001 (removendo MAT-1002) para exercitar a remoção de item órfão.\n\n**Pré-requisito:** Rodar testAlfa/primeiro-pedido antes (não rodar nenhuma conferência sobre MAT-1002 antes deste teste).\n\n**Regra validada:** DESING_V3.md §3.5.1 (Decisão 4 — hard delete condicional): MAT-1002 tem quantidade_recebida=0 e nenhuma divergência registrada ⇒ deve ser hard delete.\n\n**Resultado esperado:** 200 OK. Conferir manualmente via GET /pedidos/{id} que MAT-1002 desapareceu da lista de itens.\n\n**Contexto original:** Fazer upsert em cima do primeiro-pedido e remover um dos itens no banco de dados;"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "testGama (2 parte)",
+      "item": [
+        {
+          "name": "01-happy-path",
+          "item": [
+            {
+              "name": "primeiro-pedido",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                      "pm.test(\"Array tem 2 elemento(s)\", function () { pm.expect(pm.response.json()).to.have.lengthOf(2); });",
+                      "pm.test(\"Algum item tem cliente_origem = 'GAMA'\", function () {",
+                      "    const body = pm.response.json();",
+                      "    const arr = Array.isArray(body) ? body : [body];",
+                      "    pm.expect(arr.some(p => p[\"cliente_origem\"] === \"GAMA\")).to.be.true;",
+                      "});",
+                      "pm.test(\"Captura {{id_gl778}} a partir de numero_pedido_origem='GL-778'\", function () {",
+                      "    const body = pm.response.json();",
+                      "    const arr = Array.isArray(body) ? body : [body];",
+                      "    const alvo = arr.find(p => p[\"numero_pedido_origem\"] === \"GL-778\");",
+                      "    pm.expect(alvo, \"não encontrou numero_pedido_origem=GL-778 na resposta\").to.not.be.undefined;",
+                      "    pm.collectionVariables.set(\"id_gl778\", alvo.id_pedido);",
+                      "});",
+                      "pm.test(\"Captura {{id_gl779}} a partir de numero_pedido_origem='GL-779'\", function () {",
+                      "    const body = pm.response.json();",
+                      "    const arr = Array.isArray(body) ? body : [body];",
+                      "    const alvo = arr.find(p => p[\"numero_pedido_origem\"] === \"GL-779\");",
+                      "    pm.expect(alvo, \"não encontrou numero_pedido_origem=GL-779 na resposta\").to.not.be.undefined;",
+                      "    pm.collectionVariables.set(\"id_gl779\", alvo.id_pedido);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-01\",\n    \"desc_mat\": \"Pallet de madeira\",\n    \"um\": \"CX\",\n    \"fator_conv\": 12,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 2,\n    \"preco_unit_centavos\": 120000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-09\",\n    \"desc_mat\": \"Caixa organizadora\",\n    \"um\": \"CX\",\n    \"fator_conv\": 3,\n    \"qtd_ped\": 4,\n    \"qtd_rec\": 0,\n    \"preco_unit_centavos\": 10000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GL-779\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"56789012000134\",\n    \"nome_fornecedor\": \"Armazéns Rio Claro Ltda\",\n    \"dt_criacao\": 1784160000,\n    \"cod_mat\": \"ARM-10\",\n\n    \"desc_mat\": \"Estrado metálico\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 100,\n    \"qtd_rec\": 100,\n    \"preco_unit_centavos\": 3500,\n    \"situacao\": 2\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Ingerir o payload oficial do Gama (3 linhas achatadas → agrupar por 'ped' em 2 pedidos: GL-778 com 2 itens, GL-779 com 1) e capturar os IDs gerados para os próximos testes.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §6 (Gama Logística) — agrupamento por ped, epoch→Instant, centavos÷100, quantidade_pedida=qtd_ped×fator_conv.\n\n**Resultado esperado:** 200 OK; resposta no MESMO formato de Alfa/Beta; array com 2 pedidos (GL-778, GL-779); cliente_origem=\"GAMA\".\n\n**Contexto original:** Payload oficial: 3 linhas → 2 pedidos (GL-778 com 2 itens, GL-779 com 1).\n\nEsperado: 200, resposta no MESMO formato do Alfa/Beta (id_pedido, numero_pedido_origem, cliente_origem, status) — NÃO pode ser ok().build().\n\nDepois de rodar, usar get-gl778-detalhe e get-gl779-detalhe (colando o id_pedido obtido via get-pedidos-cliente-origem-gama) e conferir o teste dourado:\n- TRP-01: quantidade_pedida=120, quantidade_recebida=24, preco_unitario=100.0000, unidade_medida=\"UN\" (não \"CX\"), status OPEN.\n- TRP-09: preco_unitario=33.3333 (10000/3, HALF_UP, escala 4).\n- GL-779: pedida=recebida=100 → quantidade_pendente=0; status CLOSED.\n- moeda=\"BRL\", cliente_origem=\"GAMA\", data_criacao do epoch 1786752000 → 2026-08-15T00:00:00Z."
+              },
+              "response": []
+            },
+            {
+              "name": "get-pedidos-cliente-origem-gama",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                      "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                      "    const arr = pm.response.json();",
+                      "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                      "});",
+                      "pm.test(\"Todos os itens têm cliente_origem = 'GAMA'\", function () {",
+                      "    const arr = pm.response.json();",
+                      "    pm.expect(arr.every(p => p[\"cliente_origem\"] === \"GAMA\")).to.be.true;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos?cliente_origem=GAMA",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos"
+                  ],
+                  "query": [
+                    {
+                      "key": "cliente_origem",
+                      "value": "GAMA"
+                    }
+                  ]
+                },
+                "description": "**Objetivo:** Localizar os id_pedido de GL-778 e GL-779 gerados no passo anterior (não é mais necessário copiar manualmente — já capturados em {{id_gl778}}/{{id_gl779}}).\n\n**Pré-requisito:** Rodar 01-happy-path/primeiro-pedido antes.\n\n**Resultado esperado:** 200 OK; array; todos os itens com cliente_origem=\"GAMA\"; sem o array de itens (listagem enxuta).\n\n**Contexto original:** Localizar os id_pedido de GL-778 e GL-779 gerados por primeiro-pedido, para usar nos GETs de detalhe abaixo."
+              },
+              "response": []
+            },
+            {
+              "name": "get-gl778-detalhe",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Detalhe do pedido traz o array de itens\", function () {",
+                      "    const body = pm.response.json();",
+                      "    pm.expect(body).to.have.property(\"itens\");",
+                      "    pm.expect(body.itens).to.be.an(\"array\");",
+                      "});",
+                      "pm.test(\"TRP-01: quantidade_pedida=120, quantidade_recebida=24, quantidade_pendente=96, preco_unitario=100.00, unidade_medida=UN\", function () {",
+                      "    const item = pm.response.json().itens.find(i => i.codigo_material === \"TRP-01\");",
+                      "    pm.expect(item, \"item TRP-01 não encontrado\").to.not.be.undefined;",
+                      "    pm.expect(Number(item.quantidade_pedida)).to.equal(120);",
+                      "    pm.expect(Number(item.quantidade_recebida)).to.equal(24);",
+                      "    pm.expect(Number(item.quantidade_pendente)).to.equal(96);",
+                      "    pm.expect(Number(item.preco_unitario)).to.equal(100);",
+                      "    pm.expect(item.unidade_medida).to.equal(\"UN\");",
+                      "});",
+                      "pm.test(\"TRP-09: preco_unitario = 33.3333 (10000/3 centavos -> reais, HALF_UP escala 4)\", function () {",
+                      "    const item = pm.response.json().itens.find(i => i.codigo_material === \"TRP-09\");",
+                      "    pm.expect(item, \"item TRP-09 não encontrado\").to.not.be.undefined;",
+                      "    pm.expect(Number(item.preco_unitario)).to.equal(33.3333);",
+                      "});",
+                      "pm.test(\"Status do pedido GL-778 é OPEN\", function () { pm.expect(pm.response.json().status).to.equal(\"OPEN\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos/{{id_gl778}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos",
+                    "{{id_gl778}}"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir o teste dourado do pedido GL-778 (TRP-01 e TRP-09) — conversão de unidade de compra, centavos e status.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; TRP-01: pedida=120, recebida=24, pendente=96, preco_unitario=100.00, unidade=UN; TRP-09: preco_unitario=33.3333 (10000/3, HALF_UP); status do pedido=OPEN.\n\n**Contexto original:** Substituir o path pelo id_pedido de GL-778 (obtido em get-pedidos-cliente-origem-gama).\n\nConferir teste dourado:\n- item TRP-01: quantidade_pedida=120, quantidade_recebida=24, quantidade_pendente=96, preco_unitario=100.0000, unidade_medida=\"UN\", status do pedido OPEN.\n- item TRP-09: quantidade_pedida=12, quantidade_recebida=0, preco_unitario=33.3333 (10000/3 centavos → reais, HALF_UP, escala 4)."
+              },
+              "response": []
+            },
+            {
+              "name": "get-gl779-detalhe",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Detalhe do pedido traz o array de itens\", function () {",
+                      "    const body = pm.response.json();",
+                      "    pm.expect(body).to.have.property(\"itens\");",
+                      "    pm.expect(body.itens).to.be.an(\"array\");",
+                      "});",
+                      "pm.test(\"GL-779: pedida=recebida=100, pendente=0, status CLOSED, moeda BRL\", function () {",
+                      "    const body = pm.response.json();",
+                      "    const item = body.itens.find(i => i.codigo_material === \"ARM-10\");",
+                      "    pm.expect(item, \"item ARM-10 não encontrado\").to.not.be.undefined;",
+                      "    pm.expect(Number(item.quantidade_pedida)).to.equal(100);",
+                      "    pm.expect(Number(item.quantidade_recebida)).to.equal(100);",
+                      "    pm.expect(Number(item.quantidade_pendente)).to.equal(0);",
+                      "    pm.expect(body.status).to.equal(\"CLOSED\");",
+                      "    pm.expect(body.moeda).to.equal(\"BRL\");",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos/{{id_gl779}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos",
+                    "{{id_gl779}}"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir o teste dourado do pedido GL-779 (item único, sem pendência, status CLOSED).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; ARM-10: pedida=recebida=100 ⇒ pendente=0; status=CLOSED; moeda=BRL.\n\n**Contexto original:** Substituir o path pelo id_pedido de GL-779.\n\nConferir teste dourado: pedida=recebida=100 → quantidade_pendente=0; status CLOSED; moeda=\"BRL\"; cliente_origem=\"GAMA\"; data_criacao do epoch 1784160000."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "02-situacao",
+          "item": [
+            {
+              "name": "situacao-1-open",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'OPEN'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"OPEN\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-SIT-OPEN\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"40111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Situação Open\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"SIT-OPEN-01\",\n    \"desc_mat\": \"Material teste situação OPEN\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 20,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 8000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** situacao: 1 → deve mapear para status OPEN.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** GamaStatusMapper (1=OPEN, 2=CLOSED, 3=BLOCKED).\n\n**Resultado esperado:** 200 OK; status=\"OPEN\".\n\n**Contexto original:** situacao: 1 → deve mapear para status OPEN. Esperado 200."
+              },
+              "response": []
+            },
+            {
+              "name": "situacao-2-closed",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'CLOSED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"CLOSED\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-SIT-CLOSED\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"40222333000144\",\n    \"nome_fornecedor\": \"Fornecedor Situação Closed\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"SIT-CLOSED-01\",\n    \"desc_mat\": \"Material teste situação CLOSED\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 30,\n    \"qtd_rec\": 30,\n    \"preco_unit_centavos\": 8000,\n    \"situacao\": 2\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** situacao: 2 → deve mapear para status CLOSED.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** GamaStatusMapper (1=OPEN, 2=CLOSED, 3=BLOCKED).\n\n**Resultado esperado:** 200 OK; status=\"CLOSED\".\n\n**Contexto original:** situacao: 2 → deve mapear para status CLOSED. Esperado 200."
+              },
+              "response": []
+            },
+            {
+              "name": "situacao-3-blocked",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'BLOCKED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"BLOCKED\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-SIT-BLOCKED\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"40333444000155\",\n    \"nome_fornecedor\": \"Fornecedor Situação Blocked\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"BLK-01\",\n    \"desc_mat\": \"Material teste situação BLOCKED 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 100,\n    \"qtd_rec\": 40,\n    \"preco_unit_centavos\": 5000,\n    \"situacao\": 3\n  },\n  {\n    \"ped\": \"GAMA-SIT-BLOCKED\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"40333444000155\",\n    \"nome_fornecedor\": \"Fornecedor Situação Blocked\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"BLK-02\",\n    \"desc_mat\": \"Material teste situação BLOCKED 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 50,\n    \"qtd_rec\": 10,\n    \"preco_unit_centavos\": 3000,\n    \"situacao\": 3\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** situacao: 3 → deve mapear para status BLOCKED. Pedido enviado já com pendência nos 2 itens, propositalmente, para ser reaproveitado em 07-conferencia-nota-fiscal/blocked-continua-avaliando-ambos-itens.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** GamaStatusMapper (1=OPEN, 2=CLOSED, 3=BLOCKED).\n\n**Resultado esperado:** 200 OK; status=\"BLOCKED\". Estado fica disponível para o teste de conferência de pedido bloqueado.\n\n**Contexto original:** situacao: 3 → deve mapear para status BLOCKED. Esperado 200.\n\nPedido enviado já com 2 itens e pendência em ambos (qtd_ped > qtd_rec) propositalmente, para ser reaproveitado no teste 07-conferencia-nota-fiscal/blocked-continua-avaliando-ambos-itens."
+              },
+              "response": []
+            },
+            {
+              "name": "situacao-99-invalida",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-SIT-INV\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"40444555000166\",\n    \"nome_fornecedor\": \"Fornecedor Situação Inválida\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"SIT-INV-01\",\n    \"desc_mat\": \"Material teste situação inválida\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 8000,\n    \"situacao\": 99\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** situacao: 99 (fora de 1/2/3) → deve dar 400.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** IllegalArgumentException do GamaStatusMapper capturada pelo ApiExceptionHandler.\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** situacao: 99 (fora de 1/2/3) → deve dar 400, IllegalArgumentException do GamaStatusMapper capturada pelo ApiExceptionHandler."
+              },
+              "response": []
+            },
+            {
+              "name": "situacao-null",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-SIT-NULL\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"40555666000177\",\n    \"nome_fornecedor\": \"Fornecedor Situação Nula\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"SIT-NULL-01\",\n    \"desc_mat\": \"Material teste situação nula\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 8000,\n    \"situacao\": null\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** situacao: null → deve dar 400.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation @NotNull em GamaPedidoLinhaDTO.situacao.\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** situacao: null → deve dar 400 por @NotNull."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "03-validacoes-campo",
+          "item": [
+            {
+              "name": "fator_conv-zero",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 0,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** fator_conv: 0 → violação de @Positive.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** fator_conv: 0 → deve dar 400 (@Positive)."
+              },
+              "response": []
+            },
+            {
+              "name": "fator_conv-negativo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": -1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** fator_conv: -1 → violação de @Positive.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** fator_conv: -1 → deve dar 400 (@Positive)."
+              },
+              "response": []
+            },
+            {
+              "name": "qtd_ped-zero",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 0,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** qtd_ped: 0 → violação de @Positive.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** qtd_ped: 0 → deve dar 400 (@Positive)."
+              },
+              "response": []
+            },
+            {
+              "name": "qtd_ped-negativo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": -1,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** qtd_ped: -1 → violação de @Positive.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** qtd_ped: -1 → deve dar 400 (@Positive)."
+              },
+              "response": []
+            },
+            {
+              "name": "qtd_rec-negativo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": -1,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** qtd_rec: -1 → violação de @PositiveOrZero.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** qtd_rec: -1 → deve dar 400 (@PositiveOrZero)."
+              },
+              "response": []
+            },
+            {
+              "name": "qtd_rec-zero-deve-passar",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 0,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** CONTROLE (não é violação): qtd_rec=0 deve PASSAR — é o caso real do payload oficial (TRP-09 chega sem nenhuma conferência prévia).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** @PositiveOrZero em GamaPedidoLinhaDTO.qtd_rec permite zero.\n\n**Resultado esperado:** 200 OK, não 400.\n\n**Contexto original:** CONTROLE (não é violação): qtd_rec: 0 deve PASSAR — é o caso real do payload oficial (TRP-09 chega sem nenhuma conferência prévia). Esperado 200, não 400."
+              },
+              "response": []
+            },
+            {
+              "name": "preco_unit_centavos-negativo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": -100,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** preco_unit_centavos: -100 → violação de @PositiveOrZero.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** preco_unit_centavos: -100 → deve dar 400 (@PositiveOrZero)."
+              },
+              "response": []
+            },
+            {
+              "name": "ped-vazio",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** ped: \"\" (em branco) → violação de @NotBlank.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** ped: \"\" (em branco) → deve dar 400 (@NotBlank)."
+              },
+              "response": []
+            },
+            {
+              "name": "ped-ausente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** ped: campo ausente do JSON → mesmo efeito de @NotBlank.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request, no MESMO formato estruturado do 400 de Alfa/Beta. Conferir também que a validação em List<@Valid ...> realmente dispara (checagem sensível a versão do Spring).\n\n**Contexto original:** ped ausente do JSON → deve dar 400 (@NotBlank), mesmo efeito de enviar em branco.\n\nUsar este teste também para confirmar 2 pontos do plano:\n1) o erro 400 vem ESTRUTURADO no mesmo formato do 400 do Alfa/Beta;\n2) a constraint de validação no argumento List<@Valid ...> do controller realmente dispara (checar isso especificamente — é fácil essa anotação \"não pegar\" dependendo da versão do Spring)."
+              },
+              "response": []
+            },
+            {
+              "name": "cnpj_fornecedor-vazio",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** cnpj_fornecedor: \"\" (em branco) → violação de @NotBlank.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** cnpj_fornecedor: \"\" (em branco) → deve dar 400 (@NotBlank). Ausência do campo deve ter o mesmo efeito."
+              },
+              "response": []
+            },
+            {
+              "name": "nome_fornecedor-vazio",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** nome_fornecedor: \"\" (em branco) → violação de @NotBlank.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** nome_fornecedor: \"\" (em branco) → deve dar 400 (@NotBlank). Ausência do campo deve ter o mesmo efeito."
+              },
+              "response": []
+            },
+            {
+              "name": "cod_mat-vazio",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** cod_mat: \"\" (em branco) → violação de @NotBlank.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** cod_mat: \"\" (em branco) → deve dar 400 (@NotBlank). Ausência do campo deve ter o mesmo efeito."
+              },
+              "response": []
+            },
+            {
+              "name": "desc_mat-vazio",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** desc_mat: \"\" (em branco) → violação de @NotBlank.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** desc_mat: \"\" (em branco) → deve dar 400 (@NotBlank). Ausência do campo deve ter o mesmo efeito."
+              },
+              "response": []
+            },
+            {
+              "name": "item-nulo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": null,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** item: null → violação de @NotNull.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** item: null → deve dar 400 (@NotNull)."
+              },
+              "response": []
+            },
+            {
+              "name": "dt_criacao-nulo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-VAL-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"50111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Validação Gama\",\n    \"dt_criacao\": null,\n    \"cod_mat\": \"VAL-001\",\n    \"desc_mat\": \"Material de teste de validação\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** dt_criacao: null → violação de @NotNull.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation em GamaPedidoLinhaDTO (List<@Valid ...> no controller).\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** dt_criacao: null → deve dar 400 (@NotNull)."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "04-agrupador-consistencia",
+          "item": [
+            {
+              "name": "mesmo-ped-cnpj-diferente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-CONSIST-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-01\",\n    \"desc_mat\": \"Material consistência 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GAMA-CONSIST-01\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"60999888000177\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-02\",\n    \"desc_mat\": \"Material consistência 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 20,\n    \"qtd_rec\": 10,\n    \"preco_unit_centavos\": 2000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Duas linhas com o mesmo 'ped' mas cnpj_fornecedor diferente.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Agrupador do Gama (GamaPayloadAgrupador) exige consistência de fornecedor/data/situação dentro do mesmo pedido.\n\n**Resultado esperado:** 400 Bad Request (IllegalArgumentException).\n\n**Contexto original:** Duas linhas com o mesmo ped mas cnpj_fornecedor diferente → deve dar 400 (IAE do GamaPayloadAgrupador)."
+              },
+              "response": []
+            },
+            {
+              "name": "mesmo-ped-nome-fornecedor-diferente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-CONSIST-02\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-01\",\n    \"desc_mat\": \"Material consistência 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GAMA-CONSIST-02\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência (nome divergente)\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-02\",\n    \"desc_mat\": \"Material consistência 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 20,\n    \"qtd_rec\": 10,\n    \"preco_unit_centavos\": 2000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Mesmo 'ped', nome_fornecedor diferente entre as linhas.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** GamaPayloadAgrupador — consistência obrigatória por pedido.\n\n**Resultado esperado:** 400 Bad Request (IllegalArgumentException).\n\n**Contexto original:** Mesmo ped, nome_fornecedor diferente entre as linhas → deve dar 400 (IAE)."
+              },
+              "response": []
+            },
+            {
+              "name": "mesmo-ped-dt_criacao-diferente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-CONSIST-03\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-01\",\n    \"desc_mat\": \"Material consistência 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GAMA-CONSIST-03\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786838400,\n    \"cod_mat\": \"CONS-02\",\n    \"desc_mat\": \"Material consistência 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 20,\n    \"qtd_rec\": 10,\n    \"preco_unit_centavos\": 2000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Mesmo 'ped', dt_criacao diferente entre as linhas.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** GamaPayloadAgrupador — consistência obrigatória por pedido.\n\n**Resultado esperado:** 400 Bad Request (IllegalArgumentException).\n\n**Contexto original:** Mesmo ped, dt_criacao diferente entre as linhas → deve dar 400 (IAE)."
+              },
+              "response": []
+            },
+            {
+              "name": "mesmo-ped-situacao-diferente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-CONSIST-04\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-01\",\n    \"desc_mat\": \"Material consistência 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GAMA-CONSIST-04\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"60111222000133\",\n    \"nome_fornecedor\": \"Fornecedor Consistência\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CONS-02\",\n    \"desc_mat\": \"Material consistência 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 20,\n    \"qtd_rec\": 10,\n    \"preco_unit_centavos\": 2000,\n    \"situacao\": 2\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Mesmo 'ped', situacao diferente entre as linhas.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** GamaPayloadAgrupador — consistência obrigatória por pedido.\n\n**Resultado esperado:** 400 Bad Request (IllegalArgumentException).\n\n**Contexto original:** Mesmo ped, situacao diferente entre as linhas → deve dar 400 (IAE)."
+              },
+              "response": []
+            },
+            {
+              "name": "array-vazio",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Array vazio [].\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Validação de lista vazia/nula no controller/agrupador do Gama.\n\n**Resultado esperado:** 400 Bad Request (IllegalArgumentException 'lista vazia/nula').\n\n**Contexto original:** Array vazio [] → deve dar 400 (IAE \"lista vazia/nula\")."
+              },
+              "response": []
+            },
+            {
+              "name": "body-nulo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "null",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Body = null (JSON literal).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** Body = null (JSON \"null\" literal) → deve dar 400."
+              },
+              "response": []
+            },
+            {
+              "name": "body-malformado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-MALFORMADO\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60444555000166\"\n  // JSON incompleto, faltam chaves/colchetes de fechamento de propósito",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** JSON malformado (colchetes/chaves não fechados) — body mantido intencionalmente inválido, NÃO normalizar.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** HttpMessageNotReadableException tratada pelo ApiExceptionHandler.\n\n**Resultado esperado:** 400 Bad Request.\n\n**Contexto original:** JSON malformado (colchetes/chaves não fechados) → deve dar 400 (HttpMessageNotReadableException tratada pelo ApiExceptionHandler)."
+              },
+              "response": []
+            },
+            {
+              "name": "linhas-nao-consecutivas-mesmo-ped",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Pedidos GAMA-NAOCONSEC-A e GAMA-NAOCONSEC-B foram criados\", function () {",
+                      "    const nums = pm.response.json().map(p => p.numero_pedido_origem);",
+                      "    pm.expect(nums).to.include.members([\"GAMA-NAOCONSEC-A\", \"GAMA-NAOCONSEC-B\"]);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-NAOCONSEC-A\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60222333000144\",\n    \"nome_fornecedor\": \"Fornecedor Não Consecutivo A\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"NC-A-01\",\n    \"desc_mat\": \"Material A item 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GAMA-NAOCONSEC-B\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"60333444000155\",\n    \"nome_fornecedor\": \"Fornecedor Não Consecutivo B\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"NC-B-01\",\n    \"desc_mat\": \"Material B item 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 15,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 1500,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GAMA-NAOCONSEC-A\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"60222333000144\",\n    \"nome_fornecedor\": \"Fornecedor Não Consecutivo A\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"NC-A-02\",\n    \"desc_mat\": \"Material A item 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 8,\n    \"qtd_rec\": 2,\n    \"preco_unit_centavos\": 800,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Edge case do agrupador: linhas do mesmo 'ped' NÃO consecutivas no array (A, B, A de novo).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Agrupamento deve usar uma estrutura que preserve todas as ocorrências por chave (ex.: LinkedHashMap<String,List<...>>), não assumir adjacência.\n\n**Resultado esperado:** 200 OK; pedidos GAMA-NAOCONSEC-A e GAMA-NAOCONSEC-B criados, A com os 2 itens (NC-A-01 e NC-A-02), sem perder a segunda ocorrência.\n\n**Contexto original:** Edge case do LinkedHashMap: linhas do mesmo ped NÃO consecutivas no array (A, B, A de novo). Esperado 200 — confirmar que ainda agrupa certo e o pedido GAMA-NAOCONSEC-A fica com os 2 itens (NC-A-01 e NC-A-02), sem perder a segunda ocorrência."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "05-reingestao-idempotencia-itens-orfaos",
+          "item": [
+            {
+              "name": "1-reenvio-oficial-payload-completo",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-01\",\n    \"desc_mat\": \"Pallet de madeira\",\n    \"um\": \"CX\",\n    \"fator_conv\": 12,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 2,\n    \"preco_unit_centavos\": 120000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-09\",\n    \"desc_mat\": \"Caixa organizadora\",\n    \"um\": \"CX\",\n    \"fator_conv\": 3,\n    \"qtd_ped\": 4,\n    \"qtd_rec\": 0,\n    \"preco_unit_centavos\": 10000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Reenviar o payload oficial de GL-778 (idêntico). Executar esta requisição 2x seguidas.\n\n**Pré-requisito:** Rodar 01-happy-path/primeiro-pedido antes.\n\n**Regra validada:** DESING_V3.md §3.5 — upsert por (numero_pedido_origem, cliente_origem), não deve duplicar.\n\n**Resultado esperado:** 200 OK nas duas execuções; nenhum pedido/fornecedor duplicado.\n\n**Contexto original:** Pré-requisito: rodar 01-happy-path/primeiro-pedido primeiro.\n\nDepois, reenviar este mesmo payload de GL-778 (idêntico) duas vezes seguidas (rodar este request 2x) → NÃO deve duplicar pedido nem fornecedor. Conferir em seguida com get-pedidos-confirma-upsert que continua existindo só 1 pedido GL-778 (upsert, não insert novo)."
+              },
+              "response": []
+            },
+            {
+              "name": "2-get-pedidos-confirma-upsert",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                      "pm.test(\"GL-778 aparece só uma vez (upsert, não duplicou)\", function () {",
+                      "    const count = pm.response.json().filter(p => p.numero_pedido_origem === \"GL-778\").length;",
+                      "    pm.expect(count).to.equal(1);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos?cliente_origem=GAMA",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos"
+                  ],
+                  "query": [
+                    {
+                      "key": "cliente_origem",
+                      "value": "GAMA"
+                    }
+                  ]
+                },
+                "description": "**Objetivo:** Confirmar que reenviar o payload oficial 2x não duplicou GL-778/GL-779 nem o fornecedor Transportes Ideal ME.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; GL-778 aparece exatamente 1 vez na listagem.\n\n**Contexto original:** Confirmar que reenviar o payload oficial 2x não duplicou GL-778/GL-779 nem o fornecedor Transportes Ideal ME."
+              },
+              "response": []
+            },
+            {
+              "name": "3-reenvio-gl778-sem-trp09-hard-delete",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-01\",\n    \"desc_mat\": \"Pallet de madeira\",\n    \"um\": \"CX\",\n    \"fator_conv\": 12,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 2,\n    \"preco_unit_centavos\": 120000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Reenviar GL-778 apenas com TRP-01 (sem TRP-09).\n\n**Pré-requisito:** Rodar o passo 1 antes; NÃO rodar nenhuma conferência sobre TRP-09 antes deste passo (precisa chegar sem histórico).\n\n**Regra validada:** DESING_V3.md §3.5.1 (Decisão 4): TRP-09 tem quantidade_recebida=0 e nenhuma divergência registrada ⇒ hard delete.\n\n**Resultado esperado:** 200 OK.\n\n**Contexto original:** IMPORTANTE: rodar isto logo após o passo 1, ANTES de qualquer conferência sobre TRP-09 (item chega com qtd_rec=0, sem conferência prévia).\n\nReenviar GL-778 apenas com TRP-01 (sem TRP-09) → TRP-09 deve ser HARD DELETE (sumir do GET /pedidos/{id})."
+              },
+              "response": []
+            },
+            {
+              "name": "4-get-gl778-confirma-trp09-removido",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Detalhe do pedido traz o array de itens\", function () {",
+                      "    const body = pm.response.json();",
+                      "    pm.expect(body).to.have.property(\"itens\");",
+                      "    pm.expect(body.itens).to.be.an(\"array\");",
+                      "});",
+                      "pm.test(\"TRP-09 foi removido (hard delete de item órfão sem histórico)\", function () {",
+                      "    const has = pm.response.json().itens.some(i => i.codigo_material === \"TRP-09\");",
+                      "    pm.expect(has).to.be.false;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos/{{id_gl778}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos",
+                    "{{id_gl778}}"
+                  ]
+                },
+                "description": "**Objetivo:** Confirmar que TRP-09 foi removido (hard delete) do pedido GL-778.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; TRP-09 não aparece mais na lista de itens.\n\n**Contexto original:** Substituir pelo id_pedido de GL-778. TRP-09 não deve mais aparecer na lista de itens (hard delete confirmado)."
+              },
+              "response": []
+            },
+            {
+              "name": "5-reingerir-gl778-completo-para-restaurar-trp09",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-01\",\n    \"desc_mat\": \"Pallet de madeira\",\n    \"um\": \"CX\",\n    \"fator_conv\": 12,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 2,\n    \"preco_unit_centavos\": 120000,\n    \"situacao\": 1\n  },\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-09\",\n    \"desc_mat\": \"Caixa organizadora\",\n    \"um\": \"CX\",\n    \"fator_conv\": 3,\n    \"qtd_ped\": 4,\n    \"qtd_rec\": 0,\n    \"preco_unit_centavos\": 10000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Restaurar o estado reingerindo TRP-01 + TRP-09, preparando o cenário de conferência + preservação.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK.\n\n**Contexto original:** Restaura o estado (reingere TRP-01 + TRP-09) para preparar o próximo cenário, de conferência + preservação."
+              },
+              "response": []
+            },
+            {
+              "name": "6-conferir-trp09-gera-divergencia",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'QUANTIDADE_EXCEDE_PENDENTE'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"QUANTIDADE_EXCEDE_PENDENTE\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"GL-778\",\n  \"cliente_origem\": \"GAMA\",\n  \"fornecedor_cnpj\": \"34567890000112\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"TRP-09\",\n      \"quantidade\": 9999,\n      \"valor_total\": 99990000.0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Registrar uma conferência tocando TRP-09 (quantidade muito acima do pendente) só para o item passar a ter histórico de conferência.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; resultado REJEITADA com QUANTIDADE_EXCEDE_PENDENTE (o que importa aqui é o efeito colateral: TRP-09 passa a ter Conferencia/Divergência registrada).\n\n**Contexto original:** Faz uma conferência de nota fiscal tocando TRP-09 (quantidade muito acima do pendente, só para gerar/registrar uma divergência — o resultado esperado da conferência em si é QUANTIDADE_EXCEDE_PENDENTE, o que importa aqui é que o item passa a ter uma conferência registrada)."
+              },
+              "response": []
+            },
+            {
+              "name": "7-reenvio-gl778-sem-trp09-apos-conferencia-preservado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GL-778\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"34567890000112\",\n    \"nome_fornecedor\": \"Transportes Ideal ME\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"TRP-01\",\n    \"desc_mat\": \"Pallet de madeira\",\n    \"um\": \"CX\",\n    \"fator_conv\": 12,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 2,\n    \"preco_unit_centavos\": 120000,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Reenviar GL-778 de novo SEM TRP-09, agora que TRP-09 já tem uma conferência/divergência registrada.\n\n**Pré-requisito:** Rodar o passo 6 antes.\n\n**Regra validada:** DESING_V3.md §3.5.1 (Decisão 4): item com divergência registrada é PRESERVADO, ao contrário do passo 3.\n\n**Resultado esperado:** 200 OK.\n\n**Contexto original:** Reenviar GL-778 de novo SEM TRP-09, agora que TRP-09 já tem uma conferência registrada (passo 6). Conforme a regra da decisão 4, desta vez TRP-09 deve ser PRESERVADO (não apagado), ao contrário do passo 3."
+              },
+              "response": []
+            },
+            {
+              "name": "8-get-gl778-confirma-trp09-preservado",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Detalhe do pedido traz o array de itens\", function () {",
+                      "    const body = pm.response.json();",
+                      "    pm.expect(body).to.have.property(\"itens\");",
+                      "    pm.expect(body.itens).to.be.an(\"array\");",
+                      "});",
+                      "pm.test(\"TRP-09 foi preservado (já tinha conferência/divergência registrada)\", function () {",
+                      "    const has = pm.response.json().itens.some(i => i.codigo_material === \"TRP-09\");",
+                      "    pm.expect(has).to.be.true;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos/{{id_gl778}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos",
+                    "{{id_gl778}}"
+                  ]
+                },
+                "description": "**Objetivo:** Confirmar que TRP-09 foi PRESERVADO mesmo tendo sido omitido do payload no passo 7.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; TRP-09 continua aparecendo na lista de itens.\n\n**Contexto original:** Substituir pelo id_pedido de GL-778. TRP-09 deve continuar aparecendo na lista de itens, mesmo tendo sido omitido do payload no passo 7."
+              },
+              "response": []
+            }
+          ],
+          "description": "Rodar os itens desta pasta NA ORDEM (1 a 8) — o estado de cada passo depende do anterior."
+        },
+        {
+          "name": "06-cross-cliente-fornecedor-unico",
+          "item": [
+            {
+              "name": "gama-atualiza-fornecedor-existente-do-alfa",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Algum item tem numero_pedido_origem = 'GAMA-CROSS-01'\", function () {",
+                      "    const body = pm.response.json();",
+                      "    const arr = Array.isArray(body) ? body : [body];",
+                      "    pm.expect(arr.some(p => p[\"numero_pedido_origem\"] === \"GAMA-CROSS-01\")).to.be.true;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-CROSS-01\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"23456789000101\",\n    \"nome_fornecedor\": \"Metalúrgica São Jorge Gama (nome atualizado)\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"CROSS-01\",\n    \"desc_mat\": \"Material cross-cliente Alfa\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 10,\n    \"qtd_rec\": 5,\n    \"preco_unit_centavos\": 4590,\n    \"situacao\": 1\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Enviar um pedido Gama com o MESMO CNPJ (sanitizado) já usado pelo fornecedor do testAlfa, atualizando o nome.\n\n**Pré-requisito:** Rodar testAlfa/primeiro-pedido antes (CNPJ 23456789000101).\n\n**Regra validada:** DESING_V3.md §3.2 — Fornecedor.cnpj é UNIQUE global entre clientes; upsert atualiza o nome, não cria um novo Fornecedor.\n\n**Resultado esperado:** 200 OK; pedido GAMA-CROSS-01 criado; Fornecedor existente atualizado (não duplicado).\n\n**Contexto original:** cnpj_fornecedor \"23456789000101\" é o MESMO CNPJ (sanitizado) já usado pelo fornecedor \"Metalúrgica São Jorge S.A.\" no testAlfa (rodar testAlfa/primeiro-pedido antes, se ainda não tiver rodado).\n\nEsperado 200 e o Fornecedor existente deve ser ATUALIZADO (nome pode mudar para o valor enviado aqui), e não criado um Fornecedor novo — confirma a regra de CNPJ único global entre clientes."
+              },
+              "response": []
+            },
+            {
+              "name": "get-pedidos-fornecedor-cross-cliente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                      "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                      "    const arr = pm.response.json();",
+                      "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                      "});",
+                      "pm.test(\"Fornecedor único: pedidos ALFA e GAMA sob o mesmo CNPJ\", function () {",
+                      "    const origens = new Set(pm.response.json().map(p => p.cliente_origem));",
+                      "    pm.expect(origens.has(\"ALFA\") && origens.has(\"GAMA\")).to.be.true;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos?fornecedor=23456789000101",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos"
+                  ],
+                  "query": [
+                    {
+                      "key": "fornecedor",
+                      "value": "23456789000101"
+                    }
+                  ]
+                },
+                "description": "**Objetivo:** Confirmar que pedidos de cliente_origem ALFA e GAMA aparecem sob o mesmo fornecedor.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; pedidos de origem ALFA e GAMA presentes; nome do fornecedor é o mais recente (enviado pelo Gama).\n\n**Contexto original:** Deve retornar pedidos de cliente_origem ALFA e GAMA sob o mesmo fornecedor (unicidade global de CNPJ), e o nome do fornecedor refletido deve ser o mais recente (o enviado pelo Gama)."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "07-conferencia-nota-fiscal",
+          "item": [
+            {
+              "name": "pre-requisito-pedido-closed-com-pendencia-gama",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'CLOSED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"CLOSED\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"ped\": \"GAMA-NF-CLOSED\",\n    \"item\": 1,\n    \"cnpj_fornecedor\": \"70111222000133\",\n    \"nome_fornecedor\": \"Fornecedor NF Closed\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"NF-CLOSED-01\",\n    \"desc_mat\": \"Material NF closed 1\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 100,\n    \"qtd_rec\": 40,\n    \"preco_unit_centavos\": 5000,\n    \"situacao\": 2\n  },\n  {\n    \"ped\": \"GAMA-NF-CLOSED\",\n    \"item\": 2,\n    \"cnpj_fornecedor\": \"70111222000133\",\n    \"nome_fornecedor\": \"Fornecedor NF Closed\",\n    \"dt_criacao\": 1786752000,\n    \"cod_mat\": \"NF-CLOSED-02\",\n    \"desc_mat\": \"Material NF closed 2\",\n    \"um\": \"UN\",\n    \"fator_conv\": 1,\n    \"qtd_ped\": 50,\n    \"qtd_rec\": 10,\n    \"preco_unit_centavos\": 3000,\n    \"situacao\": 2\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/ingest/gama",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "ingest",
+                    "gama"
+                  ]
+                },
+                "description": "**Objetivo:** Criar pedido GAMA-NF-CLOSED forçado como CLOSED mas com pendência em 2 itens (situação artificial, análoga ao pedido-closed-com-pendência do Alfa).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; status=\"CLOSED\".\n\n**Contexto original:** Pré-requisito para o teste closed-continua-avaliando-ambos-itens abaixo: pedido GAMA-NF-CLOSED forçado como CLOSED mas com pendência em 2 itens (situação artificial só para o teste, análoga ao pedido-closed-com-pendência do Alfa)."
+              },
+              "response": []
+            },
+            {
+              "name": "aprovada-dentro-do-pendente",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'APROVADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"APROVADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"GL-778\",\n  \"cliente_origem\": \"GAMA\",\n  \"fornecedor_cnpj\": \"34567890000112\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"TRP-01\",\n      \"quantidade\": 50,\n      \"valor_total\": 5000.0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir 50 UN de TRP-01 (pendente=96 UN a R$100,00/UN) por R$5000,00 — dentro do pendente e da tolerância.\n\n**Pré-requisito:** Rodar 01-happy-path/primeiro-pedido antes (usa GL-778 / TRP-01).\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 1 — tolerância absoluta de R$0,05.\n\n**Resultado esperado:** 200 OK; resultado=APROVADA.\n\n**Contexto original:** Pedido GL-778 (OPEN), item TRP-01 tem quantidade_pendente=96 UN (120-24) a R$100,0000/UN. Enviando 50 UN por R$5000,00 (dentro do pendente e dentro da tolerância de R$0,05) → esperado APROVADA."
+              },
+              "response": []
+            },
+            {
+              "name": "quantidade-excede-pendente-trp01",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'QUANTIDADE_EXCEDE_PENDENTE'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"QUANTIDADE_EXCEDE_PENDENTE\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"GL-778\",\n  \"cliente_origem\": \"GAMA\",\n  \"fornecedor_cnpj\": \"34567890000112\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"TRP-01\",\n      \"quantidade\": 200,\n      \"valor_total\": 20000.0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir 200 UN de TRP-01, excedendo a quantidade_pendente (96 UN).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §5.2 — QUANTIDADE_EXCEDE_PENDENTE.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com QUANTIDADE_EXCEDE_PENDENTE.\n\n**Contexto original:** 200 UN excede a quantidade_pendente de TRP-01 (96 UN) → esperado QUANTIDADE_EXCEDE_PENDENTE."
+              },
+              "response": []
+            },
+            {
+              "name": "valor-divergente-fora-tolerancia",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'VALOR_DIVERGENTE'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"VALOR_DIVERGENTE\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"GL-778\",\n  \"cliente_origem\": \"GAMA\",\n  \"fornecedor_cnpj\": \"34567890000112\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"TRP-01\",\n      \"quantidade\": 50,\n      \"valor_total\": 5000.1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir 50 UN de TRP-01 por R$5000,10 (diferença de R$0,10, acima da tolerância de R$0,05).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 1 — tolerância absoluta de R$0,05.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com VALOR_DIVERGENTE.\n\n**Contexto original:** 50 UN a R$100,0000/UN deveria fechar em R$5000,00; enviando R$5000,10 (diferença de R$0,10 > tolerância de R$0,05) → esperado VALOR_DIVERGENTE."
+              },
+              "response": []
+            },
+            {
+              "name": "blocked-continua-avaliando-ambos-itens",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'PEDIDO_BLOQUEADO'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"PEDIDO_BLOQUEADO\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });",
+                      "pm.test(\"PEDIDO_BLOQUEADO aparece ao menos 2x (ambos os itens avaliados, sem short-circuit)\", function () {",
+                      "    const text = JSON.stringify(pm.response.json());",
+                      "    const count = (text.match(/PEDIDO_BLOQUEADO/g) || []).length;",
+                      "    pm.expect(count).to.be.at.least(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"GAMA-SIT-BLOCKED\",\n  \"cliente_origem\": \"GAMA\",\n  \"fornecedor_cnpj\": \"40333444000155\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"BLK-01\",\n      \"quantidade\": 60,\n      \"valor_total\": 3000.0\n    },\n    {\n      \"codigo_material\": \"BLK-02\",\n      \"quantidade\": 40,\n      \"valor_total\": 1200.0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir os 2 itens (BLK-01, BLK-02) do pedido GAMA-SIT-BLOCKED (situacao=3).\n\n**Pré-requisito:** Rodar 02-situacao/situacao-3-blocked antes.\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 2 — BLOCKED não aborta a conferência (sem short-circuit); avalia a lista inteira.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA; PEDIDO_BLOQUEADO aparece para AMBOS os itens (não só o primeiro).\n\n**Contexto original:** Pedido GAMA-SIT-BLOCKED (situacao=3) — rodar 02-situacao/situacao-3-blocked antes. Conferência com 2 itens (BLK-01 e BLK-02) → AMBOS devem voltar como PEDIDO_BLOQUEADO (confirma que o serviço não retorna cedo/short-circuit ao achar o primeiro item de um pedido bloqueado, e sim continua avaliando o resto da lista)."
+              },
+              "response": []
+            },
+            {
+              "name": "closed-continua-avaliando-ambos-itens",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'PEDIDO_ENCERRADO'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"PEDIDO_ENCERRADO\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });",
+                      "pm.test(\"PEDIDO_ENCERRADO aparece ao menos 2x (ambos os itens avaliados, sem short-circuit)\", function () {",
+                      "    const text = JSON.stringify(pm.response.json());",
+                      "    const count = (text.match(/PEDIDO_ENCERRADO/g) || []).length;",
+                      "    pm.expect(count).to.be.at.least(2);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"GAMA-NF-CLOSED\",\n  \"cliente_origem\": \"GAMA\",\n  \"fornecedor_cnpj\": \"70111222000133\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"NF-CLOSED-01\",\n      \"quantidade\": 60,\n      \"valor_total\": 3000.0\n    },\n    {\n      \"codigo_material\": \"NF-CLOSED-02\",\n      \"quantidade\": 40,\n      \"valor_total\": 1200.0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir os 2 itens (NF-CLOSED-01, NF-CLOSED-02) do pedido GAMA-NF-CLOSED (situacao=2, forçado com pendência).\n\n**Pré-requisito:** Rodar 07-conferencia-nota-fiscal/pre-requisito-pedido-closed-com-pendencia-gama antes.\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 2 — CLOSED não aborta a conferência (sem short-circuit).\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA; PEDIDO_ENCERRADO aparece para AMBOS os itens.\n\n**Contexto original:** Pedido GAMA-NF-CLOSED (situacao=2, forçado com pendência) — rodar pre-requisito-pedido-closed-com-pendencia-gama antes. Conferência com 2 itens (NF-CLOSED-01 e NF-CLOSED-02) → AMBOS devem voltar como PEDIDO_ENCERRADO, sem retorno antecipado."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "08-regressao",
+          "item": [
+            {
+              "name": "lembrete-rodar-suite-completa-alfa-e-beta",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/pedidos",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "pedidos"
+                  ]
+                },
+                "description": "**Objetivo:** Lembrete de processo (não é um teste de Gama): depois de implementar Gama, rodar a coleção INTEIRA de testAlfa e testBeta (Collection Runner) e confirmar Open/Closed Principle — nada mudou de comportamento.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK — apenas confirma que o serviço está no ar antes de rodar a suíte completa.\n\n**Contexto original:** Isto não é um teste de Gama em si — é um lembrete de processo do plano: depois de implementar Gama, rodar a coleção INTEIRA das pastas testAlfa e testBeta (via Collection Runner, por exemplo) e confirmar que nada mudou de comportamento (Open/Closed Principle). Este GET simples de /pedidos serve como ponto de partida rápido para conferir que o serviço subiu antes de rodar a suíte completa."
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "testConsultaConferenciaRelatório",
+      "item": [
+        {
+          "name": "testConsultaPedidos",
+          "item": [
+            {
+              "name": "get-pedidos",
+              "item": [
+                {
+                  "name": "get-pedidos-pendência",
+                  "item": [
+                    {
+                      "name": "get-pedidos-com-pendencia-true",
+                      "event": [
+                        {
+                          "listen": "test",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                              "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                              "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                              "    const arr = pm.response.json();",
+                              "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                              "});"
+                            ]
+                          }
+                        }
+                      ],
+                      "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                          "raw": "{{base_url}}/pedidos?com_pendencia=true",
+                          "host": [
+                            "{{base_url}}"
+                          ],
+                          "path": [
+                            "pedidos"
+                          ],
+                          "query": [
+                            {
+                              "key": "com_pendencia",
+                              "value": "true",
+                              "description": "FIltrar pedidos que TEM pendências"
+                            }
+                          ]
+                        },
+                        "description": "**Objetivo:** Filtrar pedidos que TÊM pendência (com_pendencia=true).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; array; listagem sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                      },
+                      "response": []
+                    },
+                    {
+                      "name": "get-pedidos-com-pendencia-false",
+                      "event": [
+                        {
+                          "listen": "test",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                              "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                              "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                              "    const arr = pm.response.json();",
+                              "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                              "});"
+                            ]
+                          }
+                        }
+                      ],
+                      "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                          "raw": "{{base_url}}/pedidos?com_pendencia=false",
+                          "host": [
+                            "{{base_url}}"
+                          ],
+                          "path": [
+                            "pedidos"
+                          ],
+                          "query": [
+                            {
+                              "key": "com_pendencia",
+                              "value": "false",
+                              "description": "FIltrar pedido que NÃO tem pendências"
+                            }
+                          ]
+                        },
+                        "description": "**Objetivo:** Filtrar pedidos que NÃO têm pendência (com_pendencia=false).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; array; listagem sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                      },
+                      "response": []
+                    },
+                    {
+                      "name": "get-pedidos-com-pendencia-none",
+                      "event": [
+                        {
+                          "listen": "test",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.test(\"Parâmetro com_pendencia vazio não causa 500\", function () { pm.expect(pm.response.code).to.not.equal(500); });"
+                            ]
+                          }
+                        }
+                      ],
+                      "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                          "raw": "{{base_url}}/pedidos?com_pendencia=",
+                          "host": [
+                            "{{base_url}}"
+                          ],
+                          "path": [
+                            "pedidos"
+                          ],
+                          "query": [
+                            {
+                              "key": "com_pendencia",
+                              "value": "",
+                              "description": "Nenhum dos dois"
+                            }
+                          ]
+                        },
+                        "description": "**Objetivo:** com_pendencia enviado vazio (nem true nem false) — caso de borda não documentado explicitamente no DESING_V3.md.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Comportamento em aberto: decidir se parâmetro vazio deve ser tratado como filtro ausente (200, sem filtrar) ou erro de binding (400). Registrar a decisão tomada.\n\n**Resultado esperado:** Não deve derrubar a aplicação com 500 — validar manualmente qual dos dois (200 ou 400) o código realmente devolve e documentar a escolha no README.\n\n**Contexto original:** Receber todos os pedidos no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                      },
+                      "response": []
+                    }
+                  ]
+                },
+                {
+                  "name": "get-pedidos-semfiltro",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                          "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos"
+                      ]
+                    },
+                    "description": "**Objetivo:** Listar todos os pedidos sem filtro.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; array; listagem sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "get-pedidos-cliente-origem",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                          "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                          "});",
+                          "pm.test(\"Todos os itens têm cliente_origem = 'ALFA'\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    pm.expect(arr.every(p => p[\"cliente_origem\"] === \"ALFA\")).to.be.true;",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos?cliente_origem=ALFA",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos"
+                      ],
+                      "query": [
+                        {
+                          "key": "cliente_origem",
+                          "value": "ALFA",
+                          "description": "Filtrar pela empresa ALFA",
+                          "type": "text"
+                        }
+                      ]
+                    },
+                    "description": "**Objetivo:** Filtrar pedidos por cliente_origem=ALFA.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; array; todos os itens com cliente_origem=\"ALFA\"; sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos com os filtros selecionados no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "get-pedidos-fornecedor",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                          "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos?fornecedor=25111789000101",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos"
+                      ],
+                      "query": [
+                        {
+                          "key": "fornecedor",
+                          "value": "25111789000101",
+                          "description": "FIltrar pelo CNPJ do fornecedor"
+                        }
+                      ]
+                    },
+                    "description": "**Objetivo:** Filtrar pedidos por fornecedor (CNPJ sanitizado) 25111789000101.\n\n**Pré-requisito:** Rodar testAlfa/segundo-pedido antes (fornecedor com esse CNPJ).\n\n**Resultado esperado:** 200 OK; array; sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos com os filtros selecionados no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "get-pedidos-status",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                          "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                          "});",
+                          "pm.test(\"Todos os itens têm status = 'OPEN'\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    pm.expect(arr.every(p => p[\"status\"] === \"OPEN\")).to.be.true;",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos?status=OPEN",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos"
+                      ],
+                      "query": [
+                        {
+                          "key": "status",
+                          "value": "OPEN",
+                          "description": "FIltrar pelo status do pedido"
+                        }
+                      ]
+                    },
+                    "description": "**Objetivo:** Filtrar pedidos por status=OPEN.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; array; todos os itens com status=\"OPEN\"; sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos com os filtros selecionados no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "get-pedidos-allfilters",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"Resposta é um array\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });",
+                          "pm.test(\"Listagem não traz o array de itens (payload leve)\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    if (Array.isArray(arr) && arr.length > 0) { pm.expect(arr[0]).to.not.have.property(\"itens\"); }",
+                          "});",
+                          "pm.test(\"Todos os itens têm status = 'OPEN'\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    pm.expect(arr.every(p => p[\"status\"] === \"OPEN\")).to.be.true;",
+                          "});",
+                          "pm.test(\"Todos os itens têm cliente_origem = 'ALFA'\", function () {",
+                          "    const arr = pm.response.json();",
+                          "    pm.expect(arr.every(p => p[\"cliente_origem\"] === \"ALFA\")).to.be.true;",
+                          "});"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos?status=OPEN&fornecedor=23456789000101&cliente_origem=ALFA",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos"
+                      ],
+                      "query": [
+                        {
+                          "key": "status",
+                          "value": "OPEN",
+                          "description": "FIltrar pelo status do pedido"
+                        },
+                        {
+                          "key": "fornecedor",
+                          "value": "23456789000101",
+                          "description": "FIltrar pelo CNPJ do fornecedor",
+                          "type": "text"
+                        },
+                        {
+                          "key": "cliente_origem",
+                          "value": "ALFA",
+                          "description": "Filtrar pela empresa ALFA",
+                          "type": "text"
+                        }
+                      ]
+                    },
+                    "description": "**Objetivo:** Combinar os 3 filtros: status=OPEN, fornecedor=23456789000101, cliente_origem=ALFA.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; array; todos os itens com status=\"OPEN\" e cliente_origem=\"ALFA\"; sem o array de itens.\n\n**Contexto original:** Receber todos os pedidos com os filtros selecionados no formato padrão estabelecido para a V360.\n\nNão deve conter os itens!"
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "get-pedidos-byid",
+              "item": [
+                {
+                  "name": "get-pedidos-byid",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                          "pm.test(\"Detalhe do pedido traz o array de itens\", function () {",
+                          "    const body = pm.response.json();",
+                          "    pm.expect(body).to.have.property(\"itens\");",
+                          "    pm.expect(body.itens).to.be.an(\"array\");",
+                          "});",
+                          "pm.test(\"Campo numero_pedido = '1000000000'\", function () { pm.expect(pm.response.json()[\"numero_pedido\"]).to.eql(\"1000000000\"); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos/{{id_pedido_sem_pendencia}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos",
+                        "{{id_pedido_sem_pendencia}}"
+                      ]
+                    },
+                    "description": "**Objetivo:** Buscar o detalhe de um pedido por id_pedido (agora automatizado via {{id_pedido_sem_pendencia}}, capturado no passo pedido-sem-pendencia-alfa — não precisa mais copiar o UUID manualmente).\n\n**Pré-requisito:** Rodar testConsultaConferenciaRelatório/pedido-sem-pendencia-alfa antes.\n\n**Regra validada:** Atenção (DESING_V3.md): o detalhe devolve o campo \"numero_pedido\" (não \"numero_pedido_origem\" como no POST /ingest/*) — mesma informação, nomes diferentes; unificar no README.\n\n**Resultado esperado:** 200 OK; corpo contém o array de itens; numero_pedido=\"1000000000\".\n\n**Contexto original:** Para testar essa sessão, vamos usar o pedido sem pendência gerado em pedido-sem-pendencia-alfa.\n\nRealizando o post dele, vamos para get-pedidos-semfiltro (ou qualquer outro get que conseguimos encontra-lo) e obtemos o id_pedido dele.\n\nCopiamos e colamos na rota do http e testamos.\n\nO resultado deve mostrar os itens do pedido, ao invés da consulta geral que foi realizada em get pedidos."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "get-pedidos-byid-error404",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/pedidos/if290d3a-f248-4007-9774-02b03d7bbee6",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "pedidos",
+                        "if290d3a-f248-4007-9774-02b03d7bbee6"
+                      ]
+                    },
+                    "description": "**Objetivo:** Buscar pedido com UUID sintaticamente inválido.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** MethodArgumentTypeMismatchException no binding do path variable UUID.\n\n**Resultado esperado:** 400 Bad Request (não 404 — o valor nem chega a ser um UUID válido para a consulta).\n\n**Contexto original:** Teste de ID inválido, deve retornar 400."
+                  },
+                  "response": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "testNotasFiscais",
+          "item": [
+            {
+              "name": "pedido-nao-encontrado-rejeitada",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'PEDIDO_NAO_ENCONTRADO'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"PEDIDO_NAO_ENCONTRADO\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"string\",\n  \"cliente_origem\": \"string\",\n  \"fornecedor_cnpj\": \"string\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"string\",\n      \"quantidade\": 0,\n      \"valor_total\": 0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir nota fiscal para um numero_pedido/cliente_origem inexistente.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §5.2/§5.3 Decisão 2 — PEDIDO_NAO_ENCONTRADO é uma DIVERGÊNCIA de negócio, não uma exceção HTTP.\n\n**Resultado esperado:** 200 OK (não é um erro HTTP, apesar do nome antigo \"-error-\"); resultado=REJEITADA com PEDIDO_NAO_ENCONTRADO."
+              },
+              "response": []
+            },
+            {
+              "name": "fornecedor-divergente-rejeitada",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'FORNECEDOR_DIVERGENTE'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"FORNECEDOR_DIVERGENTE\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"1000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"string\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"SEM-PEND\",\n      \"quantidade\": 0,\n      \"valor_total\": 0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir nota fiscal do pedido 1000000000 (existe) com fornecedor_cnpj diferente do CNPJ real do pedido.\n\n**Pré-requisito:** Rodar pedido-sem-pendencia-alfa antes.\n\n**Regra validada:** DESING_V3.md §5.2 — FORNECEDOR_DIVERGENTE.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com FORNECEDOR_DIVERGENTE.\n\n**Notas do payload (removidas do body para manter o JSON válido):** quantidade pendente no pedido; já que sem pendência, valor é 0"
+              },
+              "response": []
+            },
+            {
+              "name": "cliente-origem-vazio-400",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 400\", function () { pm.response.to.have.status(400); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"1000000000\",\n  \"cliente_origem\": \"\",\n  \"fornecedor_cnpj\": \"1236789000101\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"SEM-PEND\",\n      \"quantidade\": 0,\n      \"valor_total\": 0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Enviar cliente_origem=\"\" (em branco) no request de conferência.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** Bean Validation (@NotBlank) em ConferenciaRequestDTO.cliente_origem — este SIM é um erro HTTP genuíno de request inválido, diferente dos demais casos desta pasta.\n\n**Resultado esperado:** 400 Bad Request.\n\n**Notas do payload (removidas do body para manter o JSON válido):** quantidade pendente no pedido; já que sem pendência, valor é 0"
+              },
+              "response": []
+            },
+            {
+              "name": "material-nao-encontrado-rejeitada",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'MATERIAL_NAO_ENCONTRADO'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"MATERIAL_NAO_ENCONTRADO\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"1000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"1236789000101\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"string\",\n      \"quantidade\": 0,\n      \"valor_total\": 0\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir nota fiscal do pedido 1000000000 com um codigo_material que não existe nos itens do pedido.\n\n**Pré-requisito:** Rodar pedido-sem-pendencia-alfa antes.\n\n**Regra validada:** DESING_V3.md §5.2 — MATERIAL_NAO_ENCONTRADO.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com MATERIAL_NAO_ENCONTRADO."
+              },
+              "response": []
+            },
+            {
+              "name": "quantidade-excede-pendente-rejeitada",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'QUANTIDADE_EXCEDE_PENDENTE'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"QUANTIDADE_EXCEDE_PENDENTE\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"numero_pedido\": \"1000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"1236789000101\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"SEM-PEND\",\n      \"quantidade\": 9999,\n      \"valor_total\": 499950\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir SEM-PEND (pendente=0, pois já foi 100% recebido) com quantidade=9999.\n\n**Pré-requisito:** Rodar pedido-sem-pendencia-alfa antes.\n\n**Regra validada:** DESING_V3.md §5.2/§5.3 Decisão 3 — QUANTIDADE_EXCEDE_PENDENTE (soma agregada por material).\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com QUANTIDADE_EXCEDE_PENDENTE.\n\n**Notas do payload (removidas do body para manter o JSON válido):** valor absurdo, valor deve ser 0 de acordo com o pedido; Ele espera o valor total baseado na quantidade que existe..."
+              },
+              "response": []
+            },
+            {
+              "name": "aprovada-multiplos-itens-mesmo-material",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'APROVADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"APROVADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "\n\n\n{\n  \"numero_pedido\": \"2000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"3216789000202\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"COM-PEND-1\",\n      \"quantidade\": 25,\n      \"valor_total\": 1250.025\n    },\n    {\n      \"codigo_material\": \"COM-PEND-1\",\n      \"quantidade\": 25,\n      \"valor_total\": 1250.025\n    },\n    {\n      \"codigo_material\": \"COM-PEND-2\",\n      \"quantidade\": 50,\n      \"valor_total\": 2500.05\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir o pedido 2000000000 (com pendência) com 2 linhas de COM-PEND-1 (25+25 UN) e 1 de COM-PEND-2 (50 UN), cada uma na borda da tolerância (diferença = R$0,05 exatos).\n\n**Pré-requisito:** Rodar pedido-com-pendência antes.\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 1 (tolerância ≤ R$0,05 aprova) e Decisão 3 (agregação por codigo_material — linhas do mesmo material se somam).\n\n**Resultado esperado:** 200 OK; resultado=APROVADA.\n\n**Notas do payload (removidas do body para manter o JSON válido):** ITENS SEPARADOS COM MESMO CÓDIGO SE SOMAM.; Limite de >= 0.05, esperado ser REJEITADO; Limite de >= 0.05, esperado ser APROVADO; Limite de >= 0.05, esperado ser APROVADO"
+              },
+              "response": []
+            },
+            {
+              "name": "valor-divergente-multiplos-itens-mesmo-material",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'VALOR_DIVERGENTE'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"VALOR_DIVERGENTE\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "\n\n\n{\n  \"numero_pedido\": \"2000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"3216789000202\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"COM-PEND-1\",\n      \"quantidade\": 25,\n      \"valor_total\": 1250.025\n    },\n    {\n      \"codigo_material\": \"COM-PEND-1\",\n      \"quantidade\": 25,\n      \"valor_total\": 1250.0251\n    },\n    {\n      \"codigo_material\": \"COM-PEND-2\",\n      \"quantidade\": 50,\n      \"valor_total\": 2500.06\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Mesmo cenário do teste anterior, mas com diferença de valor um pouco ACIMA da tolerância (R$0,0501 e R$0,06).\n\n**Pré-requisito:** Rodar pedido-com-pendência antes.\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 1 — diferença > R$0,05 gera VALOR_DIVERGENTE.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com VALOR_DIVERGENTE.\n\n**Notas do payload (removidas do body para manter o JSON válido):** ITENS SEPARADOS COM MESMO CÓDIGO SE SOMAM.; Limite de >= 0.05, esperado ser REJEITADO; Limite de >= 0.05, esperado ser REJEITADO; Limite de >= 0.05, esperado ser REJEITADO"
+              },
+              "response": []
+            },
+            {
+              "name": "pedido-bloqueado-rejeitada",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'PEDIDO_BLOQUEADO'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"PEDIDO_BLOQUEADO\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "\n\n{\n  \"numero_pedido\": \"3000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"4446789000202\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"COM-PEND-BLOCKED\",\n      \"quantidade\": 100,\n      \"valor_total\": 5000\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir o pedido 3000000000 (status BLOCKED, com pendência).\n\n**Pré-requisito:** Rodar pedido-blocked-com-pendência antes.\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 2 — BLOCKED não aborta, mas gera divergência PEDIDO_BLOQUEADO e a avaliação continua.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com PEDIDO_BLOQUEADO.\n\n**Notas do payload (removidas do body para manter o JSON válido):** REALIZAR POST DE BLOCKED COM PENDÊNCIA ANTES DE TESTAR; quantidade pendente no pedido; sobraram 100 e o valor unitário é 50: 100 * 50 = 5000"
+              },
+              "response": []
+            },
+            {
+              "name": "pedido-encerrado-rejeitada",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Resposta contém o valor 'PEDIDO_ENCERRADO'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"PEDIDO_ENCERRADO\\\"\"); });",
+                      "pm.test(\"Resposta contém o valor 'REJEITADA'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"REJEITADA\\\"\"); });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "\n\n{\n  \"numero_pedido\": \"3000000000\",\n  \"cliente_origem\": \"ALFA\",\n  \"fornecedor_cnpj\": \"4446789000202\",\n  \"itens\": [\n    {\n      \"codigo_material\": \"COM-PEND-CLOSED\",\n      \"quantidade\": 100,\n      \"valor_total\": 5000\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/notas-fiscais/conferir",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "notas-fiscais",
+                    "conferir"
+                  ]
+                },
+                "description": "**Objetivo:** Conferir o pedido 3000000000 (status CLOSED, com pendência).\n\n**Pré-requisito:** Rodar pedido-closed-com-pendência antes (reingestão do mesmo numero_pedido com status closed).\n\n**Regra validada:** DESING_V3.md §5.3 Decisão 2 — CLOSED não aborta, mas gera divergência PEDIDO_ENCERRADO.\n\n**Resultado esperado:** 200 OK; resultado=REJEITADA com PEDIDO_ENCERRADO.\n\n**Notas do payload (removidas do body para manter o JSON válido):** REALIZAR POST DE CLOSED COM PENDÊNCIA ANTES DE TESTAR; quantidade pendente no pedido; sobraram 100 e o valor unitário é 50: 100 * 50 = 5000"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "testConferencias",
+          "item": [
+            {
+              "name": "get-conferencias",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                      "pm.test(\"Corpo é um objeto JSON válido\", function () { pm.expect(pm.response.json()).to.be.an(\"object\"); });"
+                    ]
+                  }
+                }
+              ],
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/relatorios/conferencias",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "relatorios",
+                    "conferencias"
+                  ]
+                },
+                "description": "**Objetivo:** Obter o relatório agregado de conferências (GET /relatorios/conferencias).\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Regra validada:** DESING_V3.md §5.4 — contagem bruta do histórico; reprocessar a mesma nota infla totais (sem idempotência, documentar como limitação conhecida).\n\n**Resultado esperado:** 200 OK; corpo é um objeto JSON válido com os totais.\n\n**Contexto original:** criar pedido SEM NENHUMA PENDÊNCIA para realizar testes de consulta"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "pedido-sem-pendencia-alfa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Captura {{id_pedido_sem_pendencia}} a partir de numero_pedido_origem='1000000000'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const arr = Array.isArray(body) ? body : [body];",
+                  "    const alvo = arr.find(p => p[\"numero_pedido_origem\"] === \"1000000000\");",
+                  "    pm.expect(alvo, \"não encontrou numero_pedido_origem=1000000000 na resposta\").to.not.be.undefined;",
+                  "    pm.collectionVariables.set(\"id_pedido_sem_pendencia\", alvo.id_pedido);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n      \"po_number\": \"1000000000\",\n      \"created_at\": \"2026-08-05\",\n      \"status\": \"open\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"1236789000101\",\n        \"name\": \"Para teste sem pendência\"\n      },\n      \"items\": [\n        {\n          \"line\": 10,\n          \"material\": \"SEM-PEND\",\n          \"description\": \"Chapa de aço 2mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 100,\n          \"quantity_received\": 100,\n          \"unit_price\": 50\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Criar pedido 1000000000 SEM nenhuma pendência (quantity_received = quantity_ordered), para os testes de consulta e conferência.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; captura id_pedido em {{id_pedido_sem_pendencia}} para uso em get-pedidos-byid.\n\n**Contexto original:** criar pedido SEM NENHUMA PENDÊNCIA para realizar testes de consulta"
+          },
+          "response": []
+        },
+        {
+          "name": "pedido-com-pendência",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n      \"po_number\": \"2000000000\",\n      \"created_at\": \"2026-08-05\",\n      \"status\": \"open\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"3216789000202\",\n        \"name\": \"Para teste com pendência\"\n      },\n      \"items\": [\n        {\n          \"line\": 10,\n          \"material\": \"COM-PEND-1\",\n          \"description\": \"Chapa de aço 2mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 100,\n          \"quantity_received\": 50,\n          \"unit_price\": 50\n        },\n        {\n          \"line\": 20,\n          \"material\": \"COM-PEND-2\",\n          \"description\": \"Chapa de aço 3mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 100,\n          \"quantity_received\": 50,\n          \"unit_price\": 50\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Criar pedido 2000000000 COM pendência em 2 materiais (COM-PEND-1, COM-PEND-2), usado nos testes de conferência aprovada/valor divergente.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK.\n\n**Contexto original:** criar pedido que foi enviado no escopo do desafio;\n\nAnalisar se existe alguma inconsistência nos dados persistidos via pgAdmin4.  \n  \nProvar que o parser lida com o formato não-RFC4180 de verdade, não com uma versão limpa que mascare o problema."
+          },
+          "response": []
+        },
+        {
+          "name": "pedido-blocked-com-pendência",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Resposta contém o valor 'BLOCKED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"BLOCKED\\\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n      \"po_number\": \"3000000000\",\n      \"created_at\": \"2026-08-05\",\n      \"status\": \"blocked\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"4446789000202\",\n        \"name\": \"Para teste com pendência BLOCKED\"\n      },\n      \"items\": [\n        {\n          \"line\": 10,\n          \"material\": \"COM-PEND-BLOCKED\",\n          \"description\": \"Chapa de aço 2mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 200,\n          \"quantity_received\": 100,\n          \"unit_price\": 50\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Criar/reingerir pedido 3000000000 como BLOCKED com pendência em COM-PEND-BLOCKED, usado no teste de conferência de pedido bloqueado.\n\n**Pré-requisito:** Nenhum — pode ser executado isoladamente.\n\n**Resultado esperado:** 200 OK; status=\"BLOCKED\".\n\n**Contexto original:** criar pedido que foi enviado no escopo do desafio;\n\nAnalisar se existe alguma inconsistência nos dados persistidos via pgAdmin4.  \n  \nProvar que o parser lida com o formato não-RFC4180 de verdade, não com uma versão limpa que mascare o problema."
+          },
+          "response": []
+        },
+        {
+          "name": "pedido-closed-com-pendência",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Resposta contém o valor 'CLOSED'\", function () { pm.expect(JSON.stringify(pm.response.json())).to.include(\"\\\"CLOSED\\\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchase_orders\": [\n    {\n      \"po_number\": \"3000000000\",\n      \"created_at\": \"2026-08-05\",\n      \"status\": \"closed\",\n      \"currency\": \"BRL\",\n      \"vendor\": {\n        \"tax_id\": \"4446789000202\",\n        \"name\": \"Para teste com pendência CLOSED\"\n      },\n      \"items\": [\n        {\n          \"line\": 10,\n          \"material\": \"COM-PEND-CLOSED\",\n          \"description\": \"Chapa de aço 2mm\",\n          \"uom\": \"UN\",\n          \"quantity_ordered\": 200,\n          \"quantity_received\": 100,\n          \"unit_price\": 50\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/ingest/alfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ingest",
+                "alfa"
+              ]
+            },
+            "description": "**Objetivo:** Reingerir o MESMO pedido 3000000000 agora como CLOSED com pendência em COM-PEND-CLOSED, usado no teste de conferência de pedido encerrado.\n\n**Pré-requisito:** Rodar pedido-blocked-com-pendência antes (mesmo numero_pedido/cliente_origem — é um upsert).\n\n**Resultado esperado:** 200 OK; status=\"CLOSED\".\n\n**Contexto original:** criar pedido que foi enviado no escopo do desafio;\n\nAnalisar se existe alguma inconsistência nos dados persistidos via pgAdmin4.  \n  \nProvar que o parser lida com o formato não-RFC4180 de verdade, não com uma versão limpa que mascare o problema."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "id_gl778",
+      "value": ""
+    },
+    {
+      "key": "id_gl779",
+      "value": ""
+    },
+    {
+      "key": "id_pedido_sem_pendencia",
+      "value": ""
+    }
+  ]
+}
